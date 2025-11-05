@@ -1,4 +1,4 @@
--- Shop Container (Automatically Tab)
+-- Shop Containerv2 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -409,5 +409,66 @@ return function(config)
 				})
 			end
 		end,
+	});
+
+	-- Enchant Section
+	local EnchantSection = ShopTab:DrawSection({
+		Name = "Auto Enchant"
+	});
+
+	EnchantSection:AddDropdown({
+		Name = "Select Enchantment",
+		Default = "Leprechaun I",
+		Values = {
+			"Leprechaun I",
+			"Leprechaun II",
+			"Mutation Hunter I",
+			"Mutation Hunter II",
+			"Gold Digger I",
+			"Reeler I",
+			"Big Hunter I",
+			"Empowered I",
+			"Glistening I",
+			"Stargazer I",
+			"Stormhunter I",
+			"XPerienced I",
+			"Cursed I",
+			"Prismatic I",
+			"Perfection"
+		},
+		Callback = function(v)
+			config.setSelectedEnchant(v)
+		end,
+	});
+
+	EnchantSection:AddToggle({
+		Name = "Auto Enchant",
+		Default = false,
+		Callback = function(Value)
+			config.setAutoEnchantEnabled(Value)
+			
+			if Value then
+				config.startAutoEnchant()
+				Notifier.new({
+					Title = "Auto Enchant",
+					Content = "Auto Enchant enabled - Will use enchant stones until getting " .. config.getSelectedEnchant(),
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				config.stopAutoEnchant()
+				Notifier.new({
+					Title = "Auto Enchant",
+					Content = "Auto Enchant disabled",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	EnchantSection:AddParagraph({
+		Title = "Instructions",
+		Text = "1. Equip your fishing rod\n2. Select desired enchantment\n3. Enable toggle\n4. Script will automatically use enchant stones until getting the enchantment"
 	});
 end
