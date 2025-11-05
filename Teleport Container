@@ -1,4 +1,4 @@
--- Teleport Container
+-- Teleportv2 Container
 -- This file contains all UI elements for the Teleport tab
 -- Includes: Islands, Rod Shops, Bait Shop, Sell Shop, Boat Seller, Other NPCs, Players
 
@@ -18,6 +18,15 @@ return function(config)
 	local setSelectedBoatSeller = config.setSelectedBoatSeller
 	local setSelectedNPC = config.setSelectedNPC
 	local setSelectedPlayer = config.setSelectedPlayer
+	
+	-- State getters
+	local getSelectedIsland = config.getSelectedIsland
+	local getSelectedRodShop = config.getSelectedRodShop
+	local getSelectedBaitShop = config.getSelectedBaitShop
+	local getSelectedSellShop = config.getSelectedSellShop
+	local getSelectedBoatSeller = config.getSelectedBoatSeller
+	local getSelectedNPC = config.getSelectedNPC
+	local getSelectedPlayer = config.getSelectedPlayer
 	
 	-- Islands Section
 	local IslandsSection = TeleportTab:DrawSection({
@@ -60,7 +69,7 @@ return function(config)
 				["Mount Hallow"] = CFrame.new(2296.05, 183.11, 2942.43)
 			}
 			
-			local selectedIsland = config.selectedIsland
+			local selectedIsland = getSelectedIsland()
 			local cframe = locations[selectedIsland]
 			if cframe then
 				teleportToLocation(cframe)
@@ -98,7 +107,7 @@ return function(config)
 				["Burt"] = CFrame.new(-2043.062, 53.497, 3772.770)
 			}
 			
-			local selectedRodShop = config.selectedRodShop
+			local selectedRodShop = getSelectedRodShop()
 			local cframe = locations[selectedRodShop]
 			if cframe then
 				teleportToLocation(cframe)
@@ -133,7 +142,7 @@ return function(config)
 				["Seth"] = CFrame.new(111.179, 17.284, 2869.168)
 			}
 			
-			local selectedBaitShop = config.selectedBaitShop
+			local selectedBaitShop = getSelectedBaitShop()
 			local cframe = locations[selectedBaitShop]
 			if cframe then
 				teleportToLocation(cframe)
@@ -172,7 +181,7 @@ return function(config)
 				["Alex"] = CFrame.new(48.053, 17.284, 2869.213)
 			}
 			
-			local selectedSellShop = config.selectedSellShop
+			local selectedSellShop = getSelectedSellShop()
 			local cframe = locations[selectedSellShop]
 			if cframe then
 				teleportToLocation(cframe)
@@ -211,7 +220,7 @@ return function(config)
 				["Boat Expert"] = CFrame.new(32.292, 9.533, 2792.113)
 			}
 			
-			local selectedBoatSeller = config.selectedBoatSeller
+			local selectedBoatSeller = getSelectedBoatSeller()
 			local cframe = locations[selectedBoatSeller]
 			if cframe then
 				teleportToLocation(cframe)
@@ -266,7 +275,7 @@ return function(config)
 				["Zombified Doge"] = CFrame.new(2174.86, 81.04, 3321.86)
 			}
 			
-			local selectedNPC = config.selectedNPC
+			local selectedNPC = getSelectedNPC()
 			if selectedNPC == "Alien Merchant" then
 				local function findAlienMerchant(folder)
 					for _, child in ipairs(folder:GetChildren()) do
@@ -339,7 +348,7 @@ return function(config)
 	PlayerTeleportSection:AddButton({
 		Name = "Teleport to Player",
 		Callback = function()
-			local selectedPlayer = config.selectedPlayer
+			local selectedPlayer = getSelectedPlayer()
 			if selectedPlayer and selectedPlayer ~= "" then
 				local targetPlayer = Players:FindFirstChild(selectedPlayer)
 				if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
