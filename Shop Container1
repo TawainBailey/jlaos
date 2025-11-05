@@ -1,4 +1,4 @@
--- Shop Containerv5 (Automatically Tab)
+-- Shop Containev6r (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -36,6 +36,7 @@ return function(config)
 	-- Functions
 	local startAutoPotion = config.startAutoPotion
 	local stopAutoPotion = config.stopAutoPotion
+	local getAllPotionNames = config.getAllPotionNames
 	
 	-- Variables for Merchant
 	local merchantGuiOpen = false
@@ -493,14 +494,8 @@ return function(config)
 		Name = "Potion",
 	});
 	
-	-- Available potions list
-	local availablePotions = {
-		"Luck I Potion",
-		"Luck II Potion", 
-		"Mutation I Potion",
-		"Coin I Potion",
-		"Admin Luck I Potion"
-	}
+	-- Get all available potions dynamically
+	local availablePotions = getAllPotionNames()
 	
 	PotionSection:AddDropdown({
 		Name = "Select Potion",
