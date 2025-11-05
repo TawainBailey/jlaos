@@ -1,0 +1,226 @@
+-- Fishing Container
+-- This file contains all UI elements for the Fishing tab
+
+return function(config)
+	local ExtractTab = config.ExtractTab
+	local Notifier = config.Notifier
+	local StartLegitAutoFish = config.StartLegitAutoFish
+	local StopLegitAutoFish = config.StopLegitAutoFish
+	local autoEquipRodEnabled = config.autoEquipRodEnabled
+	local startAutoEquipRod = config.startAutoEquipRod
+	local stopAutoEquipRod = config.stopAutoEquipRod
+	local autoClickMinigameEnabled = config.autoClickMinigameEnabled
+	local StartStandaloneAutoClickMinigame = config.StartStandaloneAutoClickMinigame
+	local StopStandaloneAutoClickMinigame = config.StopStandaloneAutoClickMinigame
+	local legitDelay = config.legitDelay
+	local shakeDelay = config.shakeDelay
+	local selectedEvents = config.selectedEvents
+	local prioritizedEvent = config.prioritizedEvent
+	local eventTeleportEnabled = config.eventTeleportEnabled
+	local startEventTeleport = config.startEventTeleport
+	local stopEventTeleport = config.stopEventTeleport
+	local setLegitDelay = config.setLegitDelay
+	local setShakeDelay = config.setShakeDelay
+	local setAutoEquipRodEnabled = config.setAutoEquipRodEnabled
+	local setAutoClickMinigameEnabled = config.setAutoClickMinigameEnabled
+	local setSelectedEvents = config.setSelectedEvents
+	local setPrioritizedEvent = config.setPrioritizedEvent
+	local setEventTeleportEnabled = config.setEventTeleportEnabled
+	
+	-- Fishing Tab Sections
+	local FishingSection = ExtractTab:DrawSection({
+		Name = "Auto Fish"
+	});
+
+	FishingSection:AddToggle({
+		Name = "Legit Auto Fish",
+		Default = false,
+		Callback = function(Value)
+			if Value then
+				StartLegitAutoFish()
+				Notifier.new({
+					Title = "Legit Auto Fish",
+					Content = "Legit auto fish enabled",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				StopLegitAutoFish()
+				Notifier.new({
+					Title = "Legit Auto Fish",
+					Content = "Legit auto fish disabled",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	FishingSection:AddToggle({
+		Name = "Auto Equip Rod",
+		Default = false,
+		Callback = function(Value)
+			setAutoEquipRodEnabled(Value)
+			
+			if Value then
+				startAutoEquipRod()
+				Notifier.new({
+					Title = "Auto Equip Rod",
+					Content = "Auto Equip Rod",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopAutoEquipRod()
+				Notifier.new({
+					Title = "Auto Equip Rod",
+					Content = "Auto Equip Rod",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	FishingSection:AddToggle({
+		Name = "Auto Click Minigame",
+		Default = false,
+		Callback = function(Value)
+			if Value then
+				setAutoClickMinigameEnabled(true)
+				StartStandaloneAutoClickMinigame()
+				Notifier.new({
+					Title = "Auto Click Minigame",
+					Content = "Auto Click Minigame enabled",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				StopStandaloneAutoClickMinigame()
+				Notifier.new({
+					Title = "Auto Click Minigame",
+					Content = "Auto Click Minigame disabled",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	FishingSection:AddTextBox({
+		Name = "Legit Delay",
+		Default = "1.1",
+		Placeholder = "0-10 seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 and value <= 10 then
+				setLegitDelay(value)
+			end
+		end,
+	});
+
+	FishingSection:AddTextBox({
+		Name = "MiniGame Delay", 
+		Default = "0.1",
+		Placeholder = "0+ seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 then
+				setShakeDelay(value)
+			end
+		end,
+	});
+
+	-- Event Fishing Section
+	local EventSection = ExtractTab:DrawSection({
+		Name = "Event Fishing"
+	});
+
+	local EventDropdown = EventSection:AddDropdown({
+		Name = "Select Events",
+		Default = {},
+		Multi = true,
+		Values = {"Ghost Shark Hunt", "Megalodon Hunt", "Shark Hunt"},
+		Callback = function(Value)
+			setSelectedEvents(Value)
+		end,
+	});
+
+	EventSection:AddButton({
+		Name = "Clear Events",
+		Callback = function()
+			setSelectedEvents({})
+			if EventDropdown and EventDropdown.SetValue then
+				EventDropdown:SetValue({})
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Event selection cleared",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
+
+	local PrioritizeDropdown = EventSection:AddDropdown({
+		Name = "Prioritize Event",
+		Default = "Ghost Shark Hunt",
+		Values = {"Ghost Shark Hunt", "Megalodon Hunt", "Shark Hunt"},
+		Callback = function(Value)
+			setPrioritizedEvent(Value)
+		end,
+	});
+
+	EventSection:AddButton({
+		Name = "Clear Priority",
+		Callback = function()
+			setPrioritizedEvent(nil)
+			if PrioritizeDropdown and PrioritizeDropdown.SetValue then
+				PrioritizeDropdown:SetValue(nil)
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Priority event cleared",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
+
+	EventSection:AddToggle({
+		Name = "Auto Event Teleport",
+		Default = false,
+		Callback = function(Value)
+			setEventTeleportEnabled(Value)
+			
+			if Value then
+				if not selectedEvents or (type(selectedEvents) == "table" and next(selectedEvents) == nil) then
+					Notifier.new({
+						Title = "No Events Selected",
+						Content = "Please select at least one event",
+						Duration = 3,
+						Icon = "rbxassetid://124426992222665"
+					});
+					setEventTeleportEnabled(false)
+					return
+				end
+				
+				startEventTeleport()
+				Notifier.new({
+					Title = "Auto Event Enabled",
+					Content = "Will teleport to selected events",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopEventTeleport()
+				Notifier.new({
+					Title = "Auto Event Disabled",
+					Content = "Event teleportation stopped",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+end
