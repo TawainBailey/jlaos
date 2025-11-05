@@ -1,24 +1,31 @@
 -- Fishing Container
--- This file contains all UI elements for the Fishing tab
+-- This file contains all UI elements for the Fishing tab (ExtractTab)
+-- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
 return function(config)
+	-- Extract all dependencies from config
 	local ExtractTab = config.ExtractTab
 	local Notifier = config.Notifier
+	
+	-- Functions
 	local StartLegitAutoFish = config.StartLegitAutoFish
 	local StopLegitAutoFish = config.StopLegitAutoFish
-	local autoEquipRodEnabled = config.autoEquipRodEnabled
 	local startAutoEquipRod = config.startAutoEquipRod
 	local stopAutoEquipRod = config.stopAutoEquipRod
-	local autoClickMinigameEnabled = config.autoClickMinigameEnabled
 	local StartStandaloneAutoClickMinigame = config.StartStandaloneAutoClickMinigame
 	local StopStandaloneAutoClickMinigame = config.StopStandaloneAutoClickMinigame
-	local legitDelay = config.legitDelay
-	local shakeDelay = config.shakeDelay
-	local selectedEvents = config.selectedEvents
-	local prioritizedEvent = config.prioritizedEvent
-	local eventTeleportEnabled = config.eventTeleportEnabled
 	local startEventTeleport = config.startEventTeleport
 	local stopEventTeleport = config.stopEventTeleport
+	local startAutoFavorite = config.startAutoFavorite
+	local stopAutoFavorite = config.stopAutoFavorite
+	local startAutoUnfavorite = config.startAutoUnfavorite
+	local stopAutoUnfavorite = config.stopAutoUnfavorite
+	local unfavoriteAllFish = config.unfavoriteAllFish
+	local startAutoSell = config.startAutoSell
+	local stopAutoSell = config.stopAutoSell
+	local sellAllItems = config.sellAllItems
+	
+	-- Setters for state variables
 	local setLegitDelay = config.setLegitDelay
 	local setShakeDelay = config.setShakeDelay
 	local setAutoEquipRodEnabled = config.setAutoEquipRodEnabled
@@ -26,6 +33,17 @@ return function(config)
 	local setSelectedEvents = config.setSelectedEvents
 	local setPrioritizedEvent = config.setPrioritizedEvent
 	local setEventTeleportEnabled = config.setEventTeleportEnabled
+	local setAutoFavoriteEnabled = config.setAutoFavoriteEnabled
+	local setAutoUnfavoriteEnabled = config.setAutoUnfavoriteEnabled
+	local setSelectedFishNames = config.setSelectedFishNames
+	local setSelectedRarity = config.setSelectedRarity
+	local setSelectedVariant = config.setSelectedVariant
+	local setAutoSellEnabled = config.setAutoSellEnabled
+	local setSellThreshold = config.setSellThreshold
+	
+	-- Get current values
+	local selectedEvents = config.selectedEvents
+	local sellThreshold = config.sellThreshold
 	
 	-- Fishing Tab Sections
 	local FishingSection = ExtractTab:DrawSection({
