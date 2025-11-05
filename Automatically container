@@ -1,367 +1,236 @@
--- Teleport Container
--- This file contains all UI elements for the Teleport tab
--- Includes: Islands, Rod Shops, Bait Shop, Sell Shop, Boat Seller, Other NPCs, Players
+-- Shop Container (Automatically Tab)
+-- This file contains all UI elements for the Shop/Automatically tab
+-- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
 return function(config)
 	-- Extract dependencies
-	local TeleportTab = config.TeleportTab
+	local ShopTab = config.ShopTab
 	local Notifier = config.Notifier
-	local Players = config.Players
 	local player = config.player
-	local teleportToLocation = config.teleportToLocation
+	local ReplicatedStorage = config.ReplicatedStorage
+	local ItemUtility = config.ItemUtility
 	
 	-- State setters
-	local setSelectedIsland = config.setSelectedIsland
-	local setSelectedRodShop = config.setSelectedRodShop
-	local setSelectedBaitShop = config.setSelectedBaitShop
-	local setSelectedSellShop = config.setSelectedSellShop
-	local setSelectedBoatSeller = config.setSelectedBoatSeller
-	local setSelectedNPC = config.setSelectedNPC
-	local setSelectedPlayer = config.setSelectedPlayer
+	local setSelectedRod = config.setSelectedRod
+	local setSelectedBobber = config.setSelectedBobber
+	local setSelectedUtility = config.setSelectedUtility
+	local setSavedPosition = config.setSavedPosition
+	local setSavePositionEnabled = config.setSavePositionEnabled
 	
-	-- Islands Section
-	local IslandsSection = TeleportTab:DrawSection({
-		Name = "Islands",
+	-- State getters
+	local getSavedPosition = config.getSavedPosition
+	local getSavePositionEnabled = config.getSavePositionEnabled
+	local getSelectedRod = config.getSelectedRod
+	local getSelectedBobber = config.getSelectedBobber
+	local getSelectedUtility = config.getSelectedUtility
+	local getSelectedWeather = config.getSelectedWeather
+	
+	-- Variables for Merchant
+	local merchantGuiOpen = false
+	local GuiControl = require(ReplicatedStorage.Modules.GuiControl)
+	
+	-- Merchant Section
+	local MerchantSection = ShopTab:DrawSection({
+		Name = "Merchant"
 	});
 
-	IslandsSection:AddDropdown({
-		Name = "Select Island",
-		Default = "Sisyphus Statue",
-		Values = {
-			"Sisyphus Statue", "Winter Fest", "Tropical Grove", "Stingrays Shores",
-			"Kohana", "Kohana Volcano", "Esoteric Depths", "Espteric Island",
-			"Crystal Island", "Coral Reefs", "Crater Island", "Treasure Room",
-			"Lost Shores", "Weather Machine", "Ancient Jungle", "Mount Hallow"
-		},
-		Callback = function(Value)
-			setSelectedIsland(Value)
-		end,
-	});
-
-	IslandsSection:AddButton({
-		Name = "Teleport to Island",
+	MerchantSection:AddButton({
+		Name = "Open/Close Merchant",
 		Callback = function()
-			local locations = {
-				["Sisyphus Statue"] = CFrame.new(-3697.973, -135.574, -1018.685),
-				["Winter Fest"] = CFrame.new(1754.948, 6.750, 3284.466),
-				["Tropical Grove"] = CFrame.new(-2136.464, 53.487, 3749.879),
-				["Stingrays Shores"] = CFrame.new(-139.242, 3.262, 2997.619),
-				["Kohana"] = CFrame.new(-635.972, 16.035, 599.515),
-				["Kohana Volcano"] = CFrame.new(-523.511, 24.000, 186.739),
-				["Esoteric Depths"] = CFrame.new(3256.965, -1300.655, 1390.791),
-				["Espteric Island"] = CFrame.new(2032.746, 27.397, 1390.033),
-				["Crystal Island"] = CFrame.new(983.730, 30.208, 4952.794),
-				["Coral Reefs"] = CFrame.new(-2850.238, 47.500, 2002.561),
-				["Crater Island"] = CFrame.new(977.105, 30.208, 4944.970),
-				["Treasure Room"] = CFrame.new(-3645.398, -266.574, -1587.146),
-				["Lost Shores"] = CFrame.new(-3594.037, 5.537, -964.424),
-				["Weather Machine"] = CFrame.new(-1497.67, 6.50, 1890.83),
-				["Ancient Jungle"] = CFrame.new(1478.30, 130.71, -613.50),
-				["Mount Hallow"] = CFrame.new(2296.05, 183.11, 2942.43)
-			}
-			
-			local selectedIsland = config.selectedIsland
-			local cframe = locations[selectedIsland]
-			if cframe then
-				teleportToLocation(cframe)
-				Notifier.new({
-					Title = "Teleported",
-					Content = "Teleported to " .. selectedIsland,
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Rod Shops Section
-	local RodShopSection = TeleportTab:DrawSection({
-		Name = "Rod Shops",
-	});
-
-	RodShopSection:AddDropdown({
-		Name = "Select Rod Shop",
-		Default = "Tim",
-		Values = {"Tim", "Sam", "Joe", "Burt"},
-		Callback = function(Value)
-			setSelectedRodShop(Value)
-		end,
-	});
-
-	RodShopSection:AddButton({
-		Name = "Teleport to Rod Shop",
-		Callback = function()
-			local locations = {
-				["Tim"] = CFrame.new(-602.112, 16.035, 609.031),
-				["Sam"] = CFrame.new(-2867.642, 47.500, 1991.258),
-				["Joe"] = CFrame.new(143.522, 20.472, 2855.004),
-				["Burt"] = CFrame.new(-2043.062, 53.497, 3772.770)
-			}
-			
-			local selectedRodShop = config.selectedRodShop
-			local cframe = locations[selectedRodShop]
-			if cframe then
-				teleportToLocation(cframe)
-				Notifier.new({
-					Title = "Teleported",
-					Content = "Teleported to " .. selectedRodShop,
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Bait Shop Section
-	local BaitShopSection = TeleportTab:DrawSection({
-		Name = "Bait Shop",
-	});
-
-	BaitShopSection:AddDropdown({
-		Name = "Select Bait Shop",
-		Default = "Seth",
-		Values = {"Seth"},
-		Callback = function(Value)
-			setSelectedBaitShop(Value)
-		end,
-	});
-
-	BaitShopSection:AddButton({
-		Name = "Teleport to Bait Shop",
-		Callback = function()
-			local locations = {
-				["Seth"] = CFrame.new(111.179, 17.284, 2869.168)
-			}
-			
-			local selectedBaitShop = config.selectedBaitShop
-			local cframe = locations[selectedBaitShop]
-			if cframe then
-				teleportToLocation(cframe)
-				Notifier.new({
-					Title = "Teleported",
-					Content = "Teleported to " .. selectedBaitShop,
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Sell Shop Section
-	local SellShopSection = TeleportTab:DrawSection({
-		Name = "Sell Shop",
-	});
-
-	SellShopSection:AddDropdown({
-		Name = "Select Sell Shop",
-		Default = "Jones",
-		Values = {"Jones", "Jones 2", "Jess", "Jed", "Alex"},
-		Callback = function(Value)
-			setSelectedSellShop(Value)
-		end,
-	});
-
-	SellShopSection:AddButton({
-		Name = "Teleport to Sell Shop",
-		Callback = function()
-			local locations = {
-				["Jones"] = CFrame.new(1662.545, 6.800, 3338.613),
-				["Jones 2"] = CFrame.new(-672.271, 16.035, 596.380),
-				["Jess"] = CFrame.new(-2840.229, 47.500, 1983.571),
-				["Jed"] = CFrame.new(-2155.518, 53.584, 3700.467),
-				["Alex"] = CFrame.new(48.053, 17.284, 2869.213)
-			}
-			
-			local selectedSellShop = config.selectedSellShop
-			local cframe = locations[selectedSellShop]
-			if cframe then
-				teleportToLocation(cframe)
-				Notifier.new({
-					Title = "Teleported",
-					Content = "Teleported to " .. selectedSellShop,
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Boat Seller Section
-	local BoatSellerSection = TeleportTab:DrawSection({
-		Name = "Boat Seller",
-	});
-
-	BoatSellerSection:AddDropdown({
-		Name = "Select Boat Seller",
-		Default = "Scott",
-		Values = {"Scott", "McBoatSon", "Jeffery", "Jeffery 2", "Boat Expert"},
-		Callback = function(Value)
-			setSelectedBoatSeller(Value)
-		end,
-	});
-
-	BoatSellerSection:AddButton({
-		Name = "Teleport to Boat Seller",
-		Callback = function()
-			local locations = {
-				["Scott"] = CFrame.new(-17.663, 9.532, 2708.228),
-				["McBoatSon"] = CFrame.new(-620.567, 3.046, 719.325),
-				["Jeffery"] = CFrame.new(1640.106, 4.295, 3255.484),
-				["Jeffery 2"] = CFrame.new(-2770.589, 4.000, 2135.360),
-				["Boat Expert"] = CFrame.new(32.292, 9.533, 2792.113)
-			}
-			
-			local selectedBoatSeller = config.selectedBoatSeller
-			local cframe = locations[selectedBoatSeller]
-			if cframe then
-				teleportToLocation(cframe)
-				Notifier.new({
-					Title = "Teleported",
-					Content = "Teleported to " .. selectedBoatSeller,
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Other NPCs Section
-	local OtherNPCSection = TeleportTab:DrawSection({
-		Name = "Other NPCs",
-	});
-
-	OtherNPCSection:AddDropdown({
-		Name = "Select NPC",
-		Default = "Billy Bob",
-		Values = {
-			"Billy Bob", "Ram", "Lonely Fisherman", "Lava Fisherman", "Esoteric GateKeeper",
-			"Silly Fisherman", "Aura Kid", "Ghost", "Temple Guardian", "Scientist",
-			"Alien Merchant", "Hallow Guardian", "Headless Horseman", "Pumpkin Bandit",
-			"Scared Guide", "Witch", "Zombified Doge"
-		},
-		Callback = function(Value)
-			setSelectedNPC(Value)
-		end,
-	});
-
-	OtherNPCSection:AddButton({
-		Name = "Teleport to NPC",
-		Callback = function()
-			local locations = {
-				["Billy Bob"] = CFrame.new(64.896, 24.535, 2950.621),
-				["Ram"] = CFrame.new(-2841.786, 47.500, 1959.058),
-				["Lonely Fisherman"] = CFrame.new(2336.760, 6.550, 2890.821),
-				["Lava Fisherman"] = CFrame.new(-591.667, 59.000, 124.187),
-				["Esoteric GateKeeper"] = CFrame.new(2101.125, -29.036, 1352.719),
-				["Silly Fisherman"] = CFrame.new(99.34, 9.53, 2706.71),
-				["Aura Kid"] = CFrame.new(67.93, 17.03, 2831.64),
-				["Ghost"] = CFrame.new(2084.95, 116.38, 3059.31),
-				["Temple Guardian"] = CFrame.new(1488.48, 127.62, -592.84),
-				["Scientist"] = CFrame.new(-4.87, 17.28, 2880.10),
-				["Hallow Guardian"] = CFrame.new(1815.74, 22.87, 3083.43),
-				["Headless Horseman"] = CFrame.new(1865.03, 23.16, 3063.97),
-				["Pumpkin Bandit"] = CFrame.new(1960.85, 39.32, 3147.75),
-				["Scared Guide"] = CFrame.new(1903.24, 22.98, 3102.25),
-				["Witch"] = CFrame.new(1883.64, 22.88, 3081.77),
-				["Zombified Doge"] = CFrame.new(2174.86, 81.04, 3321.86)
-			}
-			
-			local selectedNPC = config.selectedNPC
-			if selectedNPC == "Alien Merchant" then
-				local function findAlienMerchant(folder)
-					for _, child in ipairs(folder:GetChildren()) do
-						if child.Name == "Alien Merchant" and child:IsA("Model") then
-							return child
-						elseif child:IsA("Folder") or child:IsA("Model") then
-							local found = findAlienMerchant(child)
-							if found then return found end
-						end
-					end
-					return nil
-				end
-				
-				local workspace = game:GetService("Workspace")
-				local npcFolder = workspace:FindFirstChild("NPC")
-				if npcFolder then
-					local alienMerchant = findAlienMerchant(npcFolder)
-					if alienMerchant then
-						local part = alienMerchant:FindFirstChildWhichIsA("BasePart")
-						if part then
-							teleportToLocation(part.CFrame)
-							Notifier.new({
-								Title = "Teleported",
-								Content = "Teleported to Alien Merchant",
-								Duration = 2,
-								Icon = "rbxassetid://124426992222665"
-							})
-						end
-					end
-				end
-			else
-				local cframe = locations[selectedNPC]
-				if cframe then
-					teleportToLocation(cframe)
+			pcall(function()
+				if GuiControl:IsOpen("Merchant") then
+					GuiControl:Close()
+					merchantGuiOpen = false
 					Notifier.new({
-						Title = "Teleported",
-						Content = "Teleported to " .. selectedNPC,
-						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
-					})
-				end
-			end
-		end,
-	});
-
-	-- Players Section
-	local PlayerTeleportSection = TeleportTab:DrawSection({
-		Name = "Players",
-	});
-
-	local function getPlayerList()
-		local playerNames = {}
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p ~= player then
-				table.insert(playerNames, p.Name)
-			end
-		end
-		return playerNames
-	end
-
-	local playerDropdown = PlayerTeleportSection:AddDropdown({
-		Name = "Select Player",
-		Default = "",
-		Values = getPlayerList(),
-		Callback = function(Value)
-			setSelectedPlayer(Value)
-		end,
-	});
-
-	PlayerTeleportSection:AddButton({
-		Name = "Teleport to Player",
-		Callback = function()
-			local selectedPlayer = config.selectedPlayer
-			if selectedPlayer and selectedPlayer ~= "" then
-				local targetPlayer = Players:FindFirstChild(selectedPlayer)
-				if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-					teleportToLocation(targetPlayer.Character.HumanoidRootPart.CFrame)
-					Notifier.new({
-						Title = "Teleported",
-						Content = "Teleported to " .. selectedPlayer,
+						Title = "Merchant",
+						Content = "Merchant GUI closed",
 						Duration = 2,
 						Icon = "rbxassetid://124426992222665"
 					})
 				else
+					GuiControl:Open("Merchant")
+					merchantGuiOpen = true
 					Notifier.new({
-						Title = "Teleport Failed",
-						Content = "Player not found or has no character",
+						Title = "Merchant",
+						Content = "Merchant GUI opened",
 						Duration = 2,
 						Icon = "rbxassetid://124426992222665"
 					})
 				end
+			end)
+		end,
+	});
+
+	MerchantSection:AddParagraph({
+		Title = "Stock & Refresh Info",
+		Content = "Loading merchant data..."
+	});
+
+	-- This will be updated dynamically
+	local merchantStockLabel = MerchantSection:AddParagraph({
+		Title = "Merchant Info",
+		Content = "Loading merchant data..."
+	});
+
+	-- Update merchant stock info
+	task.spawn(function()
+		local Replion = require(ReplicatedStorage.Packages.Replion)
+		local merchantReplion = Replion.Client:WaitReplion("Merchant")
+		
+		local function updateMerchantInfo()
+			pcall(function()
+				local items = merchantReplion:GetExpect("Items")
+				local itemCount = #items
+				
+				-- Calculate next refresh time
+				local currentTime = workspace:GetServerTimeNow()
+				local nextRefresh = (math.floor(currentTime / 86400) + 1) * 86400 - currentTime
+				local hours = math.floor(nextRefresh / 3600)
+				local minutes = math.floor((nextRefresh % 3600) / 60)
+				local seconds = math.floor(nextRefresh % 60)
+				
+				local stockText = string.format("Items in stock: %d", itemCount)
+				local refreshText = string.format("Refresh: %dH %dM %dS", hours, minutes, seconds)
+				
+				merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
+			end)
+		end
+		
+		-- Update every second
+		while task.wait(1) do
+			updateMerchantInfo()
+		end
+	end)
+
+	-- Save Position Section
+	local SavePositionSection = ShopTab:DrawSection({
+		Name = "Save Position"
+	});
+
+	SavePositionSection:AddToggle({
+		Name = "Auto Teleport to Saved Position",
+		Default = false,
+		Callback = function(Value)
+			setSavePositionEnabled(Value)
+			if Value and getSavedPosition() then
+				-- Teleport to saved position when enabled
+				pcall(function()
+					local character = player.Character
+					if character and character:FindFirstChild("HumanoidRootPart") then
+						character.HumanoidRootPart.CFrame = getSavedPosition()
+						Notifier.new({
+							Title = "Save Position",
+							Content = "Teleported to saved position",
+							Duration = 2,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			end
+		end,
+	});
+
+	SavePositionSection:AddButton({
+		Name = "Save Position",
+		Callback = function()
+			pcall(function()
+				local character = player.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					setSavedPosition(character.HumanoidRootPart.CFrame)
+					Notifier.new({
+						Title = "Save Position",
+						Content = "Position saved successfully!",
+						Duration = 2,
+						Icon = "rbxassetid://124426992222665"
+					})
+				end
+			end)
+		end,
+	});
+
+	SavePositionSection:AddButton({
+		Name = "Reset Position",
+		Callback = function()
+			setSavedPosition(nil)
+			setSavePositionEnabled(false)
+			Notifier.new({
+				Title = "Save Position",
+				Content = "Saved position has been reset",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		end,
+	});
+
+	-- Auto teleport on script execution
+	if getSavePositionEnabled() and getSavedPosition() then
+		task.spawn(function()
+			task.wait(1) -- Wait a bit for character to load
+			pcall(function()
+				local character = player.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					character.HumanoidRootPart.CFrame = getSavedPosition()
+				end
+			end)
+		end)
+	end
+
+	-- Fishing Rods Section
+	local FishingRodsSection = ShopTab:DrawSection({
+		Name = "Fishing Rods"
+	});
+
+	FishingRodsSection:AddDropdown({
+		Name = "Select Fishing Rod",
+		Default = "Starter Rod",
+		Values = {
+			'Starter Rod', 'Lucky Rod', 'Gold Rod', 'Carbon Rod', 'Hyper Rod',
+			'Steampunk Rod', 'Magma Rod', 'Ice Rod', 'Chrome Rod', 'Midnight Rod',
+			'Lava Rod', 'Luck Rod', 'Lightning Rod', 'Grass Rod', 'Cute Rod',
+			'Toy Rod', 'Frozen Rod', 'Ares Rod', 'Angler Rod', 'Bamboo Rod',
+			'Astral Rod', 'Demascus Rod', 'Fluorescent Rod'
+		},
+		Callback = function(v)
+			setSelectedRod(v)
+		end,
+	});
+
+	FishingRodsSection:AddButton({
+		Name = "Purchase Selected Rod",
+		Callback = function()
+			local selectedRod = getSelectedRod()
+			if selectedRod then
+				pcall(function()
+					local PurchaseFishingRodRemote = config.PurchaseFishingRodRemote
+					if not PurchaseFishingRodRemote then
+						local Net = require(ReplicatedStorage.Packages.Net)
+						PurchaseFishingRodRemote = Net:RemoteFunction("PurchaseFishingRod")
+						config.PurchaseFishingRodRemote = PurchaseFishingRodRemote
+					end
+					
+					local rods = ItemUtility:GetFishingRods()
+					local rodId = nil
+					for _, rodData in ipairs(rods) do
+						if rodData.Data.Name == selectedRod then
+							rodId = rodData.Data.Id
+							break
+						end
+					end
+					
+					if rodId then
+						PurchaseFishingRodRemote:InvokeServer(rodId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedRod,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
 			else
 				Notifier.new({
-					Title = "No Player Selected",
-					Content = "Please select a player first",
+					Title = "Shop Error",
+					Content = "Please select a rod first",
 					Duration = 2,
 					Icon = "rbxassetid://124426992222665"
 				})
@@ -369,13 +238,181 @@ return function(config)
 		end,
 	});
 
-	-- Auto-refresh player list every 3 seconds
-	task.spawn(function()
-		while task.wait(3) do
-			pcall(function()
-				local newPlayerList = getPlayerList()
-				playerDropdown:Refresh(newPlayerList, false)
-			end)
-		end
-	end)
+	-- Baits Section
+	local BaitsSection = ShopTab:DrawSection({
+		Name = "Baits/Bobbers"
+	});
+
+	BaitsSection:AddDropdown({
+		Name = "Select Bait",
+		Default = "Starter Bait",
+		Values = {
+			'Starter Bait', 'Luck Bait', 'Gold Bait', 'Nature Bait', 
+			'Topwater Bait', 'Anchor Bait', 'Frozen Bait', 'Midnight Bait',
+			'Hyper Bait', 'Aether Bait', 'Chroma Bait', 'Corrupt Bait',
+			'Dark Matter Bait', 'Beach Ball Bait', 'Bag-O-Gold', 'Floral Bait'
+		},
+		Callback = function(v)
+			setSelectedBobber(v)
+		end,
+	});
+
+	BaitsSection:AddButton({
+		Name = "Purchase Selected Bait",
+		Callback = function()
+			local selectedBobber = getSelectedBobber()
+			if selectedBobber then
+				pcall(function()
+					local PurchaseBaitRemote = config.PurchaseBaitRemote
+					if not PurchaseBaitRemote then
+						PurchaseBaitRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseBait"]
+						config.PurchaseBaitRemote = PurchaseBaitRemote
+					end
+					
+					local baits = ItemUtility:GetBaits()
+					local baitId = nil
+					for _, baitData in ipairs(baits) do
+						if baitData.Data.Name == selectedBobber then
+							baitId = baitData.Data.Id
+							break
+						end
+					end
+					
+					if baitId then
+						PurchaseBaitRemote:InvokeServer(baitId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedBobber,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a bait first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Utilities Section
+	local UtilitiesSection = ShopTab:DrawSection({
+		Name = "Utilities/Gear"
+	});
+
+	UtilitiesSection:AddDropdown({
+		Name = "Select Utility",
+		Default = "Diving Gear",
+		Values = {
+			'Diving Gear', 'Fishing Radar'
+		},
+		Callback = function(v)
+			setSelectedUtility(v)
+		end,
+	});
+
+	UtilitiesSection:AddButton({
+		Name = "Purchase Selected Utility",
+		Callback = function()
+			local selectedUtility = getSelectedUtility()
+			if selectedUtility then
+				pcall(function()
+					local PurchaseGearRemote = config.PurchaseGearRemote
+					if not PurchaseGearRemote then
+						PurchaseGearRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseGear"]
+						config.PurchaseGearRemote = PurchaseGearRemote
+					end
+					
+					local gear = ItemUtility:GetGear()
+					local gearId = nil
+					for _, gearData in ipairs(gear) do
+						if gearData.Data.Name == selectedUtility then
+							gearId = gearData.Data.Id
+							break
+						end
+					end
+					
+					if gearId then
+						PurchaseGearRemote:InvokeServer(gearId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedUtility,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a utility first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Weather Section
+	local WeatherSection = ShopTab:DrawSection({
+		Name = "Weather"
+	});
+
+	WeatherSection:AddDropdown({
+		Name = "Select Weather",
+		Default = "Clear",
+		Values = {
+			'Clear', 'Windy', 'Foggy', 'Rainy', 'Cloudy'
+		},
+		Callback = function(v)
+			config.setSelectedWeather(v)
+		end,
+	});
+
+	WeatherSection:AddButton({
+		Name = "Purchase Selected Weather",
+		Callback = function()
+			local selectedWeather = getSelectedWeather()
+			if selectedWeather then
+				pcall(function()
+					local PurchaseWeatherRemote = config.PurchaseWeatherRemote
+					if not PurchaseWeatherRemote then
+						PurchaseWeatherRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseWeather"]
+						config.PurchaseWeatherRemote = PurchaseWeatherRemote
+					end
+					
+					-- Weather IDs mapping
+					local weatherIds = {
+						['Clear'] = 'clear',
+						['Windy'] = 'windy',
+						['Foggy'] = 'foggy',
+						['Rainy'] = 'rainy',
+						['Cloudy'] = 'cloudy'
+					}
+					
+					local weatherId = weatherIds[selectedWeather]
+					if weatherId then
+						PurchaseWeatherRemote:InvokeServer(weatherId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased Weather: " .. selectedWeather,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a weather first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
 end
