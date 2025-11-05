@@ -74,32 +74,38 @@ return function(config)
 
 	-- Update merchant stock info
 	task.spawn(function()
-		local Replion = require(ReplicatedStorage.Packages.Replion)
-		local merchantReplion = Replion.Client:WaitReplion("Merchant")
-		
-		local function updateMerchantInfo()
-			pcall(function()
-				local items = merchantReplion:GetExpect("Items")
-				local itemCount = #items
-				
-				-- Calculate next refresh time
-				local currentTime = workspace:GetServerTimeNow()
-				local nextRefresh = (math.floor(currentTime / 86400) + 1) * 86400 - currentTime
-				local hours = math.floor(nextRefresh / 3600)
-				local minutes = math.floor((nextRefresh % 3600) / 60)
-				local seconds = math.floor(nextRefresh % 60)
-				
-				local stockText = string.format("Items in stock: %d", itemCount)
-				local refreshText = string.format("Refresh: %dH %dM %dS", hours, minutes, seconds)
-				
-				merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
-			end)
-		end
-		
-		-- Update every second
-		while task.wait(1) do
+		task.wait(1) -- Wait for replion to be ready
+		pcall(function()
+			local Replion = require(ReplicatedStorage.Packages.Replion)
+			local merchantReplion = Replion.Client:WaitReplion("Merchant")
+			
+			local function updateMerchantInfo()
+				pcall(function()
+					local items = merchantReplion:GetExpect("Items")
+					local itemCount = items and #items or 0
+					
+					-- Calculate next refresh time
+					local currentTime = workspace:GetServerTimeNow()
+					local nextRefresh = (math.floor(currentTime / 86400) + 1) * 86400 - currentTime
+					local hours = math.floor(nextRefresh / 3600)
+					local minutes = math.floor((nextRefresh % 3600) / 60)
+					local seconds = math.floor(nextRefresh % 60)
+					
+					local stockText = string.format("Items in stock: %d", itemCount)
+					local refreshText = string.format("Refresh: %dh %dm %ds", hours, minutes, seconds)
+					
+					merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
+				end)
+			end
+			
+			-- Initial update
 			updateMerchantInfo()
-		end
+			
+			-- Update every second
+			while task.wait(1) do
+				updateMerchantInfo()
+			end
+		end)
 	end)
 
 	-- Save Position Section
@@ -366,7 +372,7 @@ return function(config)
 		Name = "Select Weather",
 		Default = "Clear",
 		Values = {
-			'Clear', 'Windy', 'Foggy', 'Rainy', 'Cloudy'
+			'Clear', 'Wind', 'Foggy', 'Rain', 'Cloudy'
 		},
 		Callback = function(v)
 			config.setSelectedWeather(v)
@@ -381,29 +387,18 @@ return function(config)
 				pcall(function()
 					local PurchaseWeatherRemote = config.PurchaseWeatherRemote
 					if not PurchaseWeatherRemote then
-						PurchaseWeatherRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseWeather"]
+						PurchaseWeatherRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseWeatherEvent"]
 						config.PurchaseWeatherRemote = PurchaseWeatherRemote
 					end
 					
-					-- Weather IDs mapping
-					local weatherIds = {
-						['Clear'] = 'clear',
-						['Windy'] = 'windy',
-						['Foggy'] = 'foggy',
-						['Rainy'] = 'rainy',
-						['Cloudy'] = 'cloudy'
-					}
-					
-					local weatherId = weatherIds[selectedWeather]
-					if weatherId then
-						PurchaseWeatherRemote:InvokeServer(weatherId)
-						Notifier.new({
-							Title = "Shop",
-							Content = "Purchased Weather: " .. selectedWeather,
-							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
-						})
-					end
+					-- Call with weather name directly (e.g., "Wind", "Rain", etc.)
+					PurchaseWeatherRemote:InvokeServer(selectedWeather)
+					Notifier.new({
+						Title = "Shop",
+						Content = "Purchased Weather: " .. selectedWeather,
+						Duration = 3,
+						Icon = "rbxassetid://124426992222665"
+					})
 				end)
 			else
 				Notifier.new({
