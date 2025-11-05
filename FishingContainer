@@ -241,4 +241,248 @@ return function(config)
 			end
 		end,
 	});
+	
+	-- Favorite Section
+	local FavoriteSection = ExtractTab:DrawSection({
+		Name = "Favorite",
+	});
+
+	local FishNamesDropdown = FavoriteSection:AddDropdown({
+		Name = "Favorite By Name",
+		Default = {},
+		Multi = true,
+		Values = {
+			"Abyshorn Fish", "Abyss Seahorse", "Ancient Arapaima", "Ancient Relic Crocodile", "Ancient Whale",
+			"Angler Fish", "Armor Catfish", "Arowana", "Ash Basslet", "Astra Damsel", "Axolotl", "Azure Damsel",
+			"Baby Pumpkin Shark", "Ballina Angelfish", "Banded Butterfly", "Bandit Angelfish", "Barracuda Fish",
+			"Beanie Leedsicheye", "Blackcap Basslet", "Bleekers Damsel", "Blob Fish", "Blob Shark", "Blue Lobster",
+			"Blue-Banded Goby", "Blueflame Ray", "Blumato Clownfish", "Boa Angelfish", "Boar Fish", "Bone Whale",
+			"Bumblebee Grouper", "Candy Butterfly", "Candy Corn Eel", "Candycane Lobster", "Catfish", "Charmed Tang",
+			"Christmas Trophy 2024", "Christmastree Longnose", "Chrome Tuna", "Clownfish", "Coal Tang", "Coney Fish",
+			"Conspi Angelfish", "Copperband Butterfly", "Corazon Damsel", "Cow Clownfish", "Crocodile", "Crystal Crab",
+			"Crystal Salamander", "Dark Eel", "Dark Pumpkin Appafish", "Dark Tentacle", "Darwin Clownfish", "Dead Fish",
+			"Dead Scary Clownfish", "Dead Spooky Koi Fish", "Dead Zombie Shark", "Deep Sea Crab", "Domino Damsel",
+			"Dorhey Tang", "Dotted Stingray", "Drippy Tucanare", "Eerie Shark", "Electric Eel", "Elshark Gran Maja",
+			"Enchanted Angelfish", "Fade Tang", "Fangtooth", "Festive Goby", "Festive Pufferfish", "Fire Goby",
+			"Firecoal Damsel", "Flame Angelfish", "Flat Fish", "Flying Fish", "Frankenstein Longsnapper",
+			"Freshwater Piranha", "Frog", "Frostborn Shark", "Gar Fish", "Ghastly Crab", "Ghastly Hermit Crab",
+			"Ghost Shark", "Ghost Spiralfish", "Ghost Worm Fish", "Giant Squid", "Gingerbread Clownfish",
+			"Gingerbread Shark", "Gingerbread Tang", "Gingerbread Turtle", "Goliath Tiger", "Great Christmas Whale",
+			"Great Whale", "Greenbee Grouper", "Hammerhead Mummy", "Hammerhead Shark", "Hawks Turtle", "Hermit Crab",
+			"Herring Fish", "Hybodus Shark", "Jellyfish", "Jennifer Dottyback", "Jewel Tang", "Kau Cardinal",
+			"King Crab", "King Jelly", "King Mackerel", "Korean Angelfish", "Lake Sturgeon", "Lava Butterfly",
+			"Lavafin Tuna", "Lined Cardinal Fish", "Lion Fish", "Lobster", "Lochness Monster", "Loggerhead Turtle",
+			"Longnose Butterfly", "Loving Shark", "Luminous Fish", "Magic Tang", "Magma Goby", "Magma Shark",
+			"Mammoth Appafish", "Manoai Statue Fish", "Manta Ray", "Maroon Butterfly", "Masked Angelfish",
+			"Maze Angelfish", "Megalodon", "Mistletoe Damsel", "Monk Fish", "Monster Shark", "Moorish Idol",
+			"Mosasaur Shark", "Mossy Fishlet", "Mossy Vampire Fish", "Narwhal", "Orange Basslet", "Orangy Goby",
+			"Orca", "Panther Eel", "Panther Grouper", "Parrot Fish", "Patriot Tang", "Pilot Fish", "Pink Dolphin",
+			"Pink Smith Damsel", "Plasma Shark", "Prismy Seahorse", "Pufferfish", "Pumpkin Angler Fish",
+			"Pumpkin Butterfly Fish", "Pumpkin Carved Shark", "Pumpkin Hermit Crab", "Pumpkin Jellyfish",
+			"Pumpkin Ray", "Pumpkin StoneTurtle", "Pygmy Goby", "Queen Crab", "Racoon Butterfly Fish", "Red Goatfish",
+			"Red Snapper", "Reef Chromis", "Robot Kraken", "Rockfish", "Rockform Cardianl", "Runic Wispeye",
+			"Sacred Guardian Squid", "Sail Fish", "Sail Tang", "Salmon", "Saw Fish", "Scare", "Scary Clownfish",
+			"Scissortail Dartfish", "Sharp One", "Sheepshead Fish", "Shrimp Goby", "Silver Tuna",
+			"Skeleton Angler Fish", "Skeleton Fish", "Skeleton Narwhal", "Skunk Tilefish", "Slurpfish Chromis",
+			"Spear Guardian", "Specked Butterfly", "Spooky Koi Fish", "Spooky Peafish", "Spotted Lantern Fish",
+			"Starfish", "Starjam Tang", "Strawberry Dotty", "Strippled Seahorse", "Sushi Cardinal", "Swordfish",
+			"Synodontis", "Talon Serpent", "Temple Spokes Tuna", "Thin Armor Shark", "Thresher Shark",
+			"Toxic Jellyfish", "Tricolore Butterfly", "Unicorn Tang", "Vampire Squid", "Vintage Blue Tang",
+			"Vintage Damsel", "Viperangler Fish", "Viperfish", "Volcanic Basslet", "Volsail Tang", "Wahoo",
+			"Watanabei Angelfish", "Water Snake", "Waveback Fish", "White Clownfish", "White Tang", "Wild Serpent",
+			"Witch Fish", "Witch Koi Fish", "Wizard Stingray", "Worm Fish", "Wraithfin Abyssal", "Yello Damselfish",
+			"Yellowfin Tuna", "Yellowstate Angelfish", "Zebra Snakehead", "Zombie Megalodon", "Zombie Shark",
+			"Zoster Butterfly"
+		},
+		Callback = function(Value)
+			setSelectedFishNames(Value)
+		end,
+	});
+
+	FavoriteSection:AddButton({
+		Name = "Clear Fish Names",
+		Callback = function()
+			setSelectedFishNames({})
+			if FishNamesDropdown and FishNamesDropdown.SetValue then
+				FishNamesDropdown:SetValue({})
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Fish names selection cleared",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
+
+	local RarityDropdown = FavoriteSection:AddDropdown({
+		Name = "Favorite By Rarity",
+		Default = {},
+		Multi = true,
+		Values = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical"},
+		Callback = function(Value)
+			setSelectedRarity(Value)
+		end,
+	});
+
+	FavoriteSection:AddButton({
+		Name = "Clear Rarity",
+		Callback = function()
+			setSelectedRarity({})
+			if RarityDropdown and RarityDropdown.SetValue then
+				RarityDropdown:SetValue({})
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Rarity selection cleared",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
+
+	local VariantDropdown = FavoriteSection:AddDropdown({
+		Name = "Favorite By Variant",
+		Default = {},
+		Multi = true,
+		Values = {
+			"Albino", "Corrupt", "Fairy Dust", "Festive", "Frozen", "Galaxy",
+			"Gemstone", "Ghost", "Gold", "Holographic", "Lightning",
+			"Midnight", "Radioactive", "Stone"
+		},
+		Callback = function(Value)
+			setSelectedVariant(Value)
+		end,
+	});
+
+	FavoriteSection:AddButton({
+		Name = "Clear Variant",
+		Callback = function()
+			setSelectedVariant({})
+			if VariantDropdown and VariantDropdown.SetValue then
+				VariantDropdown:SetValue({})
+			end
+			Notifier.new({
+				Title = "Cleared",
+				Content = "Variant selection cleared",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
+
+	FavoriteSection:AddToggle({
+		Name = "Auto Favorite",
+		Default = false,
+		Callback = function(Value)
+			setAutoFavoriteEnabled(Value)
+			
+			if Value then
+				startAutoFavorite()
+				Notifier.new({
+					Title = "Auto Favorite Enabled",
+					Content = "Will auto-favorite matching fish",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopAutoFavorite()
+				Notifier.new({
+					Title = "Auto Favorite Disabled",
+					Content = "Auto favorite turned off",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	FavoriteSection:AddToggle({
+		Name = "Auto Unfavorite",
+		Default = false,
+		Callback = function(Value)
+			setAutoUnfavoriteEnabled(Value)
+			
+			if Value then
+				startAutoUnfavorite()
+				Notifier.new({
+					Title = "Auto Unfavorite Enabled",
+					Content = "Will auto-unfavorite matching fish",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopAutoUnfavorite()
+				Notifier.new({
+					Title = "Auto Unfavorite Disabled",
+					Content = "Auto unfavorite turned off",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	FavoriteSection:AddButton({
+		Name = "Unfavorite All",
+		Callback = function()
+			unfavoriteAllFish()
+		end,
+	});
+
+	-- Sell Section
+	local SellSection = ExtractTab:DrawSection({
+		Name = "Sell",
+	});
+
+	SellSection:AddToggle({
+		Name = "Auto Sell",
+		Default = false,
+		Callback = function(Value)
+			setAutoSellEnabled(Value)
+			
+			if Value then
+				startAutoSell()
+				Notifier.new({
+					Title = "Auto Sell Enabled",
+					Content = "Will auto-sell every " .. sellThreshold .. " seconds",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopAutoSell()
+				Notifier.new({
+					Title = "Auto Sell Disabled",
+					Content = "Auto sell turned off",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
+			end
+		end,
+	});
+
+	SellSection:AddTextBox({
+		Name = "Sell Timer (seconds)",
+		Default = "0",
+		Placeholder = "0+ seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0 then
+				setSellThreshold(value)
+			end
+		end,
+	});
+
+	SellSection:AddButton({
+		Name = "Sell All",
+		Callback = function()
+			sellAllItems()
+			Notifier.new({
+				Title = "Sell All",
+				Content = "Sold all items",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			});
+		end,
+	});
 end
