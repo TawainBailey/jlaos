@@ -41,9 +41,10 @@ return function(config)
 	local setAutoSellEnabled = config.setAutoSellEnabled
 	local setSellThreshold = config.setSellThreshold
 	
-	-- Get current values
-	local selectedEvents = config.selectedEvents
-	local sellThreshold = config.sellThreshold
+	-- Getters
+	local getSelectedEvents = config.getSelectedEvents
+	local getPrioritizedEvent = config.getPrioritizedEvent
+	local getSellThreshold = config.getSellThreshold
 	
 	-- Fishing Tab Sections
 	local FishingSection = ExtractTab:DrawSection({
@@ -212,6 +213,7 @@ return function(config)
 			setEventTeleportEnabled(Value)
 			
 			if Value then
+				local selectedEvents = getSelectedEvents()
 				if not selectedEvents or (type(selectedEvents) == "table" and next(selectedEvents) == nil) then
 					Notifier.new({
 						Title = "No Events Selected",
@@ -443,9 +445,10 @@ return function(config)
 			
 			if Value then
 				startAutoSell()
+				local currentThreshold = getSellThreshold()
 				Notifier.new({
 					Title = "Auto Sell Enabled",
-					Content = "Will auto-sell every " .. sellThreshold .. " seconds",
+					Content = "Will auto-sell every " .. currentThreshold .. " seconds",
 					Duration = 3,
 					Icon = "rbxassetid://124426992222665"
 				});
