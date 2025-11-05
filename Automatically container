@@ -57,13 +57,15 @@ return function(config)
 		end,
 	});
 
-	MerchantSection:AddLabel({
-		Name = "Stock & Refresh Info:"
+	MerchantSection:AddParagraph({
+		Title = "Stock & Refresh Info",
+		Content = "Loading merchant data..."
 	});
 
 	-- This will be updated dynamically
-	local merchantStockLabel = MerchantSection:AddLabel({
-		Name = "Loading merchant data..."
+	local merchantStockLabel = MerchantSection:AddParagraph({
+		Title = "Merchant Info",
+		Content = "Loading merchant data..."
 	});
 
 	-- Update merchant stock info
@@ -86,7 +88,7 @@ return function(config)
 				local stockText = string.format("Items in stock: %d", itemCount)
 				local refreshText = string.format("Refresh: %dH %dM %dS", hours, minutes, seconds)
 				
-				merchantStockLabel:SetValue(stockText .. " | " .. refreshText)
+				merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
 			end)
 		end
 		
