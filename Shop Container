@@ -16,6 +16,10 @@ return function(config)
 	local setSelectedUtility = config.setSelectedUtility
 	local setSavedPosition = config.setSavedPosition
 	local setSavePositionEnabled = config.setSavePositionEnabled
+	local setSelectedEnchant = config.setSelectedEnchant
+	local setAutoEnchantEnabled = config.setAutoEnchantEnabled
+	local setSelectedPotions = config.setSelectedPotions
+	local setAutoPotionEnabled = config.setAutoPotionEnabled
 	
 	-- State getters
 	local getSavedPosition = config.getSavedPosition
@@ -24,6 +28,14 @@ return function(config)
 	local getSelectedBobber = config.getSelectedBobber
 	local getSelectedUtility = config.getSelectedUtility
 	local getSelectedWeather = config.getSelectedWeather
+	local getSelectedEnchant = config.getSelectedEnchant
+	local getAutoEnchantEnabled = config.getAutoEnchantEnabled
+	local getSelectedPotions = config.getSelectedPotions
+	local getAutoPotionEnabled = config.getAutoPotionEnabled
+	
+	-- Functions
+	local startAutoPotion = config.startAutoPotion
+	local stopAutoPotion = config.stopAutoPotion
 	
 	-- Variables for Merchant
 	local merchantGuiOpen = false
@@ -474,5 +486,57 @@ return function(config)
 	EnchantSection:AddParagraph({
 		Title = "Instructions",
 		Text = "1. Equip an enchant stone\n2. Click 'Teleport to Enchant Altar'\n3. Click 'Enchant' to use the stone\n4. Wait for enchant animation to complete"
+	});
+	
+	-- Potion Section
+	local PotionSection = ShopTab:DrawSection({
+		Name = "Potion",
+	});
+	
+	-- Available potions list
+	local availablePotions = {
+		"Luck I Potion",
+		"Luck II Potion", 
+		"Mutation I Potion",
+		"Coin I Potion",
+		"Admin Luck I Potion"
+	}
+	
+	PotionSection:AddDropdown({
+		Name = "Select Potions",
+		Default = {},
+		Options = availablePotions,
+		MultiSelect = true,
+		Callback = function(Value)
+			setSelectedPotions(Value)
+		end,
+	});
+	
+	PotionSection:AddToggle({
+		Name = "Auto Use Potions",
+		Default = false,
+		Callback = function(Value)
+			setAutoPotionEnabled(Value)
+			
+			if Value then
+				startAutoPotion()
+				
+				Notifier.new({
+					Title = "Auto Potion Enabled",
+					Content = "Will automatically use selected potions",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				stopAutoPotion()
+				
+				Notifier.new({
+					Title = "Auto Potion Disabled",
+					Content = "Stopped auto using potions",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
 	});
 end
