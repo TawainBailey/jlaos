@@ -1,4 +1,4 @@
--- Shop Containerv4 (Automatically Tab)
+-- Shop Containerv5 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -503,10 +503,10 @@ return function(config)
 	}
 	
 	PotionSection:AddDropdown({
-		Name = "Select Potions",
-		Default = {},
+		Name = "Select Potion",
+		Default = "",
 		Options = availablePotions,
-		MultiSelect = true,
+		MultiSelect = false,
 		Callback = function(Value)
 			setSelectedPotions(Value)
 		end,
@@ -523,7 +523,7 @@ return function(config)
 				
 				Notifier.new({
 					Title = "Auto Potion Enabled",
-					Content = "Will automatically use selected potions",
+					Content = "Will automatically use selected potion",
 					Duration = 3,
 					Icon = "rbxassetid://124426992222665"
 				})
@@ -532,7 +532,7 @@ return function(config)
 				
 				Notifier.new({
 					Title = "Auto Potion Disabled",
-					Content = "Stopped auto using potions",
+					Content = "Stopped auto using potion",
 					Duration = 2,
 					Icon = "rbxassetid://124426992222665"
 				})
