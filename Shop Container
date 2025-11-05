@@ -1,0 +1,418 @@
+-- Shop Container (Automatically Tab)
+-- This file contains all UI elements for the Shop/Automatically tab
+-- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
+
+return function(config)
+	-- Extract dependencies
+	local ShopTab = config.ShopTab
+	local Notifier = config.Notifier
+	local player = config.player
+	local ReplicatedStorage = config.ReplicatedStorage
+	local ItemUtility = config.ItemUtility
+	
+	-- State setters
+	local setSelectedRod = config.setSelectedRod
+	local setSelectedBobber = config.setSelectedBobber
+	local setSelectedUtility = config.setSelectedUtility
+	local setSavedPosition = config.setSavedPosition
+	local setSavePositionEnabled = config.setSavePositionEnabled
+	
+	-- State getters
+	local getSavedPosition = config.getSavedPosition
+	local getSavePositionEnabled = config.getSavePositionEnabled
+	local getSelectedRod = config.getSelectedRod
+	local getSelectedBobber = config.getSelectedBobber
+	local getSelectedUtility = config.getSelectedUtility
+	local getSelectedWeather = config.getSelectedWeather
+	
+	-- Variables for Merchant
+	local merchantGuiOpen = false
+	local GuiControl = require(ReplicatedStorage.Modules.GuiControl)
+	
+	-- Merchant Section
+	local MerchantSection = ShopTab:DrawSection({
+		Name = "Merchant"
+	});
+
+	MerchantSection:AddButton({
+		Name = "Open/Close Merchant",
+		Callback = function()
+			pcall(function()
+				if GuiControl:IsOpen("Merchant") then
+					GuiControl:Close()
+					merchantGuiOpen = false
+					Notifier.new({
+						Title = "Merchant",
+						Content = "Merchant GUI closed",
+						Duration = 2,
+						Icon = "rbxassetid://124426992222665"
+					})
+				else
+					GuiControl:Open("Merchant")
+					merchantGuiOpen = true
+					Notifier.new({
+						Title = "Merchant",
+						Content = "Merchant GUI opened",
+						Duration = 2,
+						Icon = "rbxassetid://124426992222665"
+					})
+				end
+			end)
+		end,
+	});
+
+	MerchantSection:AddParagraph({
+		Title = "Stock & Refresh Info",
+		Content = "Loading merchant data..."
+	});
+
+	-- This will be updated dynamically
+	local merchantStockLabel = MerchantSection:AddParagraph({
+		Title = "Merchant Info",
+		Content = "Loading merchant data..."
+	});
+
+	-- Update merchant stock info
+	task.spawn(function()
+		local Replion = require(ReplicatedStorage.Packages.Replion)
+		local merchantReplion = Replion.Client:WaitReplion("Merchant")
+		
+		local function updateMerchantInfo()
+			pcall(function()
+				local items = merchantReplion:GetExpect("Items")
+				local itemCount = #items
+				
+				-- Calculate next refresh time
+				local currentTime = workspace:GetServerTimeNow()
+				local nextRefresh = (math.floor(currentTime / 86400) + 1) * 86400 - currentTime
+				local hours = math.floor(nextRefresh / 3600)
+				local minutes = math.floor((nextRefresh % 3600) / 60)
+				local seconds = math.floor(nextRefresh % 60)
+				
+				local stockText = string.format("Items in stock: %d", itemCount)
+				local refreshText = string.format("Refresh: %dH %dM %dS", hours, minutes, seconds)
+				
+				merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
+			end)
+		end
+		
+		-- Update every second
+		while task.wait(1) do
+			updateMerchantInfo()
+		end
+	end)
+
+	-- Save Position Section
+	local SavePositionSection = ShopTab:DrawSection({
+		Name = "Save Position"
+	});
+
+	SavePositionSection:AddToggle({
+		Name = "Auto Teleport to Saved Position",
+		Default = false,
+		Callback = function(Value)
+			setSavePositionEnabled(Value)
+			if Value and getSavedPosition() then
+				-- Teleport to saved position when enabled
+				pcall(function()
+					local character = player.Character
+					if character and character:FindFirstChild("HumanoidRootPart") then
+						character.HumanoidRootPart.CFrame = getSavedPosition()
+						Notifier.new({
+							Title = "Save Position",
+							Content = "Teleported to saved position",
+							Duration = 2,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			end
+		end,
+	});
+
+	SavePositionSection:AddButton({
+		Name = "Save Position",
+		Callback = function()
+			pcall(function()
+				local character = player.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					setSavedPosition(character.HumanoidRootPart.CFrame)
+					Notifier.new({
+						Title = "Save Position",
+						Content = "Position saved successfully!",
+						Duration = 2,
+						Icon = "rbxassetid://124426992222665"
+					})
+				end
+			end)
+		end,
+	});
+
+	SavePositionSection:AddButton({
+		Name = "Reset Position",
+		Callback = function()
+			setSavedPosition(nil)
+			setSavePositionEnabled(false)
+			Notifier.new({
+				Title = "Save Position",
+				Content = "Saved position has been reset",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		end,
+	});
+
+	-- Auto teleport on script execution
+	if getSavePositionEnabled() and getSavedPosition() then
+		task.spawn(function()
+			task.wait(1) -- Wait a bit for character to load
+			pcall(function()
+				local character = player.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					character.HumanoidRootPart.CFrame = getSavedPosition()
+				end
+			end)
+		end)
+	end
+
+	-- Fishing Rods Section
+	local FishingRodsSection = ShopTab:DrawSection({
+		Name = "Fishing Rods"
+	});
+
+	FishingRodsSection:AddDropdown({
+		Name = "Select Fishing Rod",
+		Default = "Starter Rod",
+		Values = {
+			'Starter Rod', 'Lucky Rod', 'Gold Rod', 'Carbon Rod', 'Hyper Rod',
+			'Steampunk Rod', 'Magma Rod', 'Ice Rod', 'Chrome Rod', 'Midnight Rod',
+			'Lava Rod', 'Luck Rod', 'Lightning Rod', 'Grass Rod', 'Cute Rod',
+			'Toy Rod', 'Frozen Rod', 'Ares Rod', 'Angler Rod', 'Bamboo Rod',
+			'Astral Rod', 'Demascus Rod', 'Fluorescent Rod'
+		},
+		Callback = function(v)
+			setSelectedRod(v)
+		end,
+	});
+
+	FishingRodsSection:AddButton({
+		Name = "Purchase Selected Rod",
+		Callback = function()
+			local selectedRod = getSelectedRod()
+			if selectedRod then
+				pcall(function()
+					local PurchaseFishingRodRemote = config.PurchaseFishingRodRemote
+					if not PurchaseFishingRodRemote then
+						local Net = require(ReplicatedStorage.Packages.Net)
+						PurchaseFishingRodRemote = Net:RemoteFunction("PurchaseFishingRod")
+						config.PurchaseFishingRodRemote = PurchaseFishingRodRemote
+					end
+					
+					local rods = ItemUtility:GetFishingRods()
+					local rodId = nil
+					for _, rodData in ipairs(rods) do
+						if rodData.Data.Name == selectedRod then
+							rodId = rodData.Data.Id
+							break
+						end
+					end
+					
+					if rodId then
+						PurchaseFishingRodRemote:InvokeServer(rodId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedRod,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a rod first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Baits Section
+	local BaitsSection = ShopTab:DrawSection({
+		Name = "Baits/Bobbers"
+	});
+
+	BaitsSection:AddDropdown({
+		Name = "Select Bait",
+		Default = "Starter Bait",
+		Values = {
+			'Starter Bait', 'Luck Bait', 'Gold Bait', 'Nature Bait', 
+			'Topwater Bait', 'Anchor Bait', 'Frozen Bait', 'Midnight Bait',
+			'Hyper Bait', 'Aether Bait', 'Chroma Bait', 'Corrupt Bait',
+			'Dark Matter Bait', 'Beach Ball Bait', 'Bag-O-Gold', 'Floral Bait'
+		},
+		Callback = function(v)
+			setSelectedBobber(v)
+		end,
+	});
+
+	BaitsSection:AddButton({
+		Name = "Purchase Selected Bait",
+		Callback = function()
+			local selectedBobber = getSelectedBobber()
+			if selectedBobber then
+				pcall(function()
+					local PurchaseBaitRemote = config.PurchaseBaitRemote
+					if not PurchaseBaitRemote then
+						PurchaseBaitRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseBait"]
+						config.PurchaseBaitRemote = PurchaseBaitRemote
+					end
+					
+					local baits = ItemUtility:GetBaits()
+					local baitId = nil
+					for _, baitData in ipairs(baits) do
+						if baitData.Data.Name == selectedBobber then
+							baitId = baitData.Data.Id
+							break
+						end
+					end
+					
+					if baitId then
+						PurchaseBaitRemote:InvokeServer(baitId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedBobber,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a bait first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Utilities Section
+	local UtilitiesSection = ShopTab:DrawSection({
+		Name = "Utilities/Gear"
+	});
+
+	UtilitiesSection:AddDropdown({
+		Name = "Select Utility",
+		Default = "Diving Gear",
+		Values = {
+			'Diving Gear', 'Fishing Radar'
+		},
+		Callback = function(v)
+			setSelectedUtility(v)
+		end,
+	});
+
+	UtilitiesSection:AddButton({
+		Name = "Purchase Selected Utility",
+		Callback = function()
+			local selectedUtility = getSelectedUtility()
+			if selectedUtility then
+				pcall(function()
+					local PurchaseGearRemote = config.PurchaseGearRemote
+					if not PurchaseGearRemote then
+						PurchaseGearRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseGear"]
+						config.PurchaseGearRemote = PurchaseGearRemote
+					end
+					
+					local gear = ItemUtility:GetGear()
+					local gearId = nil
+					for _, gearData in ipairs(gear) do
+						if gearData.Data.Name == selectedUtility then
+							gearId = gearData.Data.Id
+							break
+						end
+					end
+					
+					if gearId then
+						PurchaseGearRemote:InvokeServer(gearId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased: " .. selectedUtility,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a utility first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Weather Section
+	local WeatherSection = ShopTab:DrawSection({
+		Name = "Weather"
+	});
+
+	WeatherSection:AddDropdown({
+		Name = "Select Weather",
+		Default = "Clear",
+		Values = {
+			'Clear', 'Windy', 'Foggy', 'Rainy', 'Cloudy'
+		},
+		Callback = function(v)
+			config.setSelectedWeather(v)
+		end,
+	});
+
+	WeatherSection:AddButton({
+		Name = "Purchase Selected Weather",
+		Callback = function()
+			local selectedWeather = getSelectedWeather()
+			if selectedWeather then
+				pcall(function()
+					local PurchaseWeatherRemote = config.PurchaseWeatherRemote
+					if not PurchaseWeatherRemote then
+						PurchaseWeatherRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseWeather"]
+						config.PurchaseWeatherRemote = PurchaseWeatherRemote
+					end
+					
+					-- Weather IDs mapping
+					local weatherIds = {
+						['Clear'] = 'clear',
+						['Windy'] = 'windy',
+						['Foggy'] = 'foggy',
+						['Rainy'] = 'rainy',
+						['Cloudy'] = 'cloudy'
+					}
+					
+					local weatherId = weatherIds[selectedWeather]
+					if weatherId then
+						PurchaseWeatherRemote:InvokeServer(weatherId)
+						Notifier.new({
+							Title = "Shop",
+							Content = "Purchased Weather: " .. selectedWeather,
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end)
+			else
+				Notifier.new({
+					Title = "Shop Error",
+					Content = "Please select a weather first",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+end
