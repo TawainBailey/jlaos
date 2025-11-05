@@ -1,0 +1,449 @@
+-- Useful Container
+-- This file contains all UI elements for the Useful tab
+-- Includes: Misc features (Infinite Oxygen, Radar Bypass, Auto Skip Cutscene, Halloween Events)
+
+return function(config)
+	-- Extract dependencies
+	local UsefulTab = config.UsefulTab
+	local Notifier = config.Notifier
+	local ReplicatedStorage = config.ReplicatedStorage
+	local RunService = config.RunService
+	local replion = config.replion
+	
+	-- State setters
+	local setInfiniteOxygenEnabled = config.setInfiniteOxygenEnabled
+	local setRadarBypassEnabled = config.setRadarBypassEnabled
+	local setAutoSkipCutsceneEnabled = config.setAutoSkipCutsceneEnabled
+	local setAutoClaimHalloweenEventEnabled = config.setAutoClaimHalloweenEventEnabled
+	local setAutoClaimHalloweenNPCEnabled = config.setAutoClaimHalloweenNPCEnabled
+	local setAutoClaimHalloweenHouseEnabled = config.setAutoClaimHalloweenHouseEnabled
+	
+	-- Getters
+	local getOriginalBlockOxygenLoss = config.getOriginalBlockOxygenLoss
+	local setOriginalBlockOxygenLoss = config.setOriginalBlockOxygenLoss
+	local getCutsceneConnection = config.getCutsceneConnection
+	local setCutsceneConnection = config.setCutsceneConnection
+	local getHalloweenEventConnection = config.getHalloweenEventConnection
+	local setHalloweenEventConnection = config.setHalloweenEventConnection
+	local getHalloweenNPCConnection = config.getHalloweenNPCConnection
+	local setHalloweenNPCConnection = config.setHalloweenNPCConnection
+	local getHalloweenHouseConnection = config.getHalloweenHouseConnection
+	local setHalloweenHouseConnection = config.setHalloweenHouseConnection
+	local getHalloweenHouses = config.getHalloweenHouses
+	local setHalloweenHouses = config.setHalloweenHouses
+	
+	-- Remotes
+	local UpdateFishingRadarRemote = config.UpdateFishingRadarRemote
+	local REReplicateCutscene = config.REReplicateCutscene
+	local REStopCutscene = config.REStopCutscene
+	local REClaimEventReward = config.REClaimEventReward
+	local RFSpecialDialogueEvent = config.RFSpecialDialogueEvent
+	
+	-- Constants
+	local halloweenNPCs = config.halloweenNPCs
+	
+	-- Misc Section
+	local MiscSection = UsefulTab:DrawSection({
+		Name = "Misc",
+	});
+
+	MiscSection:AddToggle({
+		Name = "Infinite Oxygen",
+		Default = false,
+		Callback = function(Value)
+			setInfiniteOxygenEnabled(Value)
+			
+			if Value then
+				pcall(function()
+					local SwimController = require(ReplicatedStorage.Controllers.SwimController)
+					
+					if not getOriginalBlockOxygenLoss() then
+						setOriginalBlockOxygenLoss(SwimController.BlockOxygenLoss)
+					end
+					
+					SwimController.BlockOxygenLoss = function(self, state)
+						return getOriginalBlockOxygenLoss()(self, true)
+					end
+					
+					SwimController:BlockOxygenLoss(true)
+				end)
+				
+				Notifier.new({
+					Title = "Infinite Oxygen Enabled",
+					Content = "Oxygen loss disabled",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				pcall(function()
+					local SwimController = require(ReplicatedStorage.Controllers.SwimController)
+					
+					if getOriginalBlockOxygenLoss() then
+						SwimController.BlockOxygenLoss = getOriginalBlockOxygenLoss()
+						SwimController:BlockOxygenLoss(false)
+						setOriginalBlockOxygenLoss(nil)
+					end
+				end)
+				
+				Notifier.new({
+					Title = "Infinite Oxygen Disabled",
+					Content = "Oxygen loss restored",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	MiscSection:AddToggle({
+		Name = "Radar Bypass",
+		Default = false,
+		Callback = function(Value)
+			setRadarBypassEnabled(Value)
+			
+			if Value then
+				pcall(function()
+					UpdateFishingRadarRemote:InvokeServer(true)
+				end)
+				
+				Notifier.new({
+					Title = "Radar Bypass Enabled",
+					Content = "Fishing zones are now visible",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				pcall(function()
+					UpdateFishingRadarRemote:InvokeServer(false)
+				end)
+				
+				Notifier.new({
+					Title = "Radar Bypass Disabled",
+					Content = "Fishing zones hidden",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	MiscSection:AddToggle({
+		Name = "Auto Skip Cutscene",
+		Default = false,
+		Callback = function(Value)
+			setAutoSkipCutsceneEnabled(Value)
+			
+			if Value then
+				if getCutsceneConnection() then
+					getCutsceneConnection():Disconnect()
+				end
+				
+				local conn = REReplicateCutscene.OnClientEvent:Connect(function()
+					task.wait(0.1)
+					pcall(function()
+						REStopCutscene:FireServer()
+					end)
+				end)
+				setCutsceneConnection(conn)
+				
+				Notifier.new({
+					Title = "Auto Skip Cutscene Enabled",
+					Content = "Cutscenes will be skipped automatically",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				if getCutsceneConnection() then
+					getCutsceneConnection():Disconnect()
+					setCutsceneConnection(nil)
+				end
+				
+				Notifier.new({
+					Title = "Auto Skip Cutscene Disabled",
+					Content = "Cutscenes will play normally",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	MiscSection:AddToggle({
+		Name = "Auto Claim Halloween Event",
+		Default = false,
+		Callback = function(Value)
+			setAutoClaimHalloweenEventEnabled(Value)
+			
+			if Value then
+				if getHalloweenEventConnection() then
+					getHalloweenEventConnection():Disconnect()
+				end
+				
+				local function claimHalloweenRewards()
+					local claimedCount = 0
+					pcall(function()
+						local eventData = replion:Get({"Hallow25Event", "Claimed"})
+						if eventData then
+							for i = 1, 15 do
+								local claimed = eventData[tostring(i)]
+								if not claimed then
+									local candyCorns = replion:Get("CandyCorns") or 0
+									local BattlepassEvent = require(ReplicatedStorage.Shared.BattlepassEvent)
+									if BattlepassEvent.BPItems[i] and candyCorns >= BattlepassEvent.BPItems[i].Cost then
+										REClaimEventReward:FireServer(i)
+										claimedCount = claimedCount + 1
+										Notifier.new({
+											Title = "Reward Claimed!",
+											Content = string.format("Claimed tier %d reward", i),
+											Duration = 2,
+											Icon = "rbxassetid://124426992222665"
+										})
+										task.wait(0.5)
+									end
+								end
+							end
+							
+							if claimedCount > 0 then
+								Notifier.new({
+									Title = "Halloween Event",
+									Content = string.format("Claimed %d rewards total", claimedCount),
+									Duration = 3,
+									Icon = "rbxassetid://124426992222665"
+								})
+							end
+						else
+							Notifier.new({
+								Title = "Halloween Event",
+								Content = "Event not active or data unavailable",
+								Duration = 3,
+								Icon = "rbxassetid://124426992222665"
+							})
+						end
+					end)
+				end
+				
+				claimHalloweenRewards()
+				local conn = RunService.Heartbeat:Connect(function()
+					task.wait(5)
+					claimHalloweenRewards()
+				end)
+				setHalloweenEventConnection(conn)
+				
+				Notifier.new({
+					Title = "Halloween Event Auto Claim Enabled",
+					Content = "Auto claiming battlepass rewards",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				if getHalloweenEventConnection() then
+					getHalloweenEventConnection():Disconnect()
+					setHalloweenEventConnection(nil)
+				end
+				
+				Notifier.new({
+					Title = "Halloween Event Auto Claim Disabled",
+					Content = "Stopped auto claiming rewards",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	MiscSection:AddToggle({
+		Name = "Auto Claim Halloween NPC",
+		Default = false,
+		Callback = function(Value)
+			setAutoClaimHalloweenNPCEnabled(Value)
+			
+			if Value then
+				if getHalloweenNPCConnection() then
+					getHalloweenNPCConnection():Disconnect()
+				end
+				
+				local function claimFromNPCs()
+					local successCount = 0
+					local workspace = game:GetService("Workspace")
+					local npcFolder = workspace:FindFirstChild("NPC")
+					
+					if not npcFolder then
+						Notifier.new({
+							Title = "NPC Folder Not Found",
+							Content = "Could not find NPC folder in workspace",
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+						return
+					end
+					
+					for _, npcName in ipairs(halloweenNPCs) do
+						pcall(function()
+							local npcModel = npcFolder:FindFirstChild(npcName)
+							if npcModel and npcModel:IsA("Model") then
+								local result, amount = RFSpecialDialogueEvent:InvokeServer(npcName, "TrickOrTreat")
+								if result == "Treat" and amount then
+									successCount = successCount + 1
+									Notifier.new({
+										Title = "Trick or Treat!",
+										Content = string.format("Got %d Candy Corns from %s", amount, npcName),
+										Duration = 2,
+										Icon = "rbxassetid://124426992222665"
+									})
+									task.wait(1)
+								elseif result == "Trick" then
+									Notifier.new({
+										Title = "Tricked!",
+										Content = string.format("%s played a trick on you", npcName),
+										Duration = 2,
+										Icon = "rbxassetid://124426992222665"
+									})
+									task.wait(1)
+								end
+							end
+						end)
+					end
+					
+					if successCount > 0 then
+						Notifier.new({
+							Title = "Halloween NPCs",
+							Content = string.format("Got treats from %d/%d NPCs", successCount, #halloweenNPCs),
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end
+				
+				claimFromNPCs()
+				local conn = RunService.Heartbeat:Connect(function()
+					task.wait(30)
+					claimFromNPCs()
+				end)
+				setHalloweenNPCConnection(conn)
+				
+				Notifier.new({
+					Title = "Halloween NPC Auto Claim Enabled",
+					Content = "Auto trick-or-treating NPCs",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				if getHalloweenNPCConnection() then
+					getHalloweenNPCConnection():Disconnect()
+					setHalloweenNPCConnection(nil)
+				end
+				
+				Notifier.new({
+					Title = "Halloween NPC Auto Claim Disabled",
+					Content = "Stopped auto claiming from NPCs",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	MiscSection:AddToggle({
+		Name = "Auto Claim Halloween House",
+		Default = false,
+		Callback = function(Value)
+			setAutoClaimHalloweenHouseEnabled(Value)
+			
+			if Value then
+				if getHalloweenHouseConnection() then
+					getHalloweenHouseConnection():Disconnect()
+				end
+				
+				local function findHouses()
+					local houses = {}
+					pcall(function()
+						local workspace = game:GetService("Workspace")
+						for _, obj in ipairs(workspace:GetDescendants()) do
+							if obj:IsA("Model") and obj:FindFirstChild("Root") and obj.Root:FindFirstChild("ProximityPrompt") then
+								if obj.Root.ProximityPrompt.ActionText == "Knock" then
+									table.insert(houses, obj.Name)
+								end
+							end
+						end
+					end)
+					setHalloweenHouses(houses)
+					return houses
+				end
+				
+				local function claimFromHouses()
+					local houses = getHalloweenHouses()
+					if #houses == 0 then
+						houses = findHouses()
+						Notifier.new({
+							Title = "House Scanner",
+							Content = string.format("Found %d Halloween houses", #houses),
+							Duration = 2,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+					
+					local successCount = 0
+					for _, houseName in ipairs(houses) do
+						pcall(function()
+							local result, amount = RFSpecialDialogueEvent:InvokeServer(houseName, "TrickOrTreatHouse")
+							if result == "Treat" and amount then
+								successCount = successCount + 1
+								Notifier.new({
+									Title = "House Treat!",
+									Content = string.format("Got %d Candy Corns from %s", amount, houseName),
+									Duration = 2,
+									Icon = "rbxassetid://124426992222665"
+								})
+								task.wait(1)
+							elseif result == "Trick" then
+								Notifier.new({
+									Title = "House Trick!",
+									Content = string.format("%s gave you a trick", houseName),
+									Duration = 2,
+									Icon = "rbxassetid://124426992222665"
+								})
+								task.wait(1)
+							end
+						end)
+					end
+					
+					if successCount > 0 then
+						Notifier.new({
+							Title = "Halloween Houses",
+							Content = string.format("Got treats from %d/%d houses", successCount, #houses),
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+					end
+				end
+				
+				findHouses()
+				claimFromHouses()
+				local conn = RunService.Heartbeat:Connect(function()
+					task.wait(45)
+					claimFromHouses()
+				end)
+				setHalloweenHouseConnection(conn)
+				
+				Notifier.new({
+					Title = "Halloween House Auto Claim Enabled",
+					Content = "Auto knocking on houses",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				if getHalloweenHouseConnection() then
+					getHalloweenHouseConnection():Disconnect()
+					setHalloweenHouseConnection(nil)
+				end
+				
+				Notifier.new({
+					Title = "Halloween House Auto Claim Disabled",
+					Content = "Stopped auto claiming from houses",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+end
