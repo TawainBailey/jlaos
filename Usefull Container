@@ -223,9 +223,12 @@ return function(config)
 				end
 				
 				claimHalloweenRewards()
+				local lastClaimTime = tick()
 				local conn = RunService.Heartbeat:Connect(function()
-					task.wait(5)
-					claimHalloweenRewards()
+					if tick() - lastClaimTime >= 5 then
+						lastClaimTime = tick()
+						claimHalloweenRewards()
+					end
 				end)
 				setHalloweenEventConnection(conn)
 				
@@ -315,9 +318,12 @@ return function(config)
 				end
 				
 				claimFromNPCs()
+				local lastClaimTime = tick()
 				local conn = RunService.Heartbeat:Connect(function()
-					task.wait(30)
-					claimFromNPCs()
+					if tick() - lastClaimTime >= 30 then
+						lastClaimTime = tick()
+						claimFromNPCs()
+					end
 				end)
 				setHalloweenNPCConnection(conn)
 				
@@ -419,9 +425,12 @@ return function(config)
 				
 				findHouses()
 				claimFromHouses()
+				local lastClaimTime = tick()
 				local conn = RunService.Heartbeat:Connect(function()
-					task.wait(45)
-					claimFromHouses()
+					if tick() - lastClaimTime >= 45 then
+						lastClaimTime = tick()
+						claimFromHouses()
+					end
 				end)
 				setHalloweenHouseConnection(conn)
 				
