@@ -1,827 +1,2284 @@
--- Shop Containerv10 (Automatically Tab)
--- This file contains all UI elements for the Shop/Automatically tab
--- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
-
-return function(config)
-	-- Extract dependencies
-	local ShopTab = config.ShopTab
-	local Notifier = config.Notifier
-	local player = config.player
-	local ReplicatedStorage = config.ReplicatedStorage
-	local ItemUtility = config.ItemUtility
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+--[[
+		Modular Fishit UI with GitHub Container Loading
 	
-	-- State setters
-	local setSelectedRod = config.setSelectedRod
-	local setSelectedBobber = config.setSelectedBobber
-	local setSelectedUtility = config.setSelectedUtility
-	local setSavedPosition = config.setSavedPosition
-	local setSavePositionEnabled = config.setSavePositionEnabled
+	Author: 4lpaca / Modified
+	
+	Press Left Alt to open / close
+]]
 
-	-- Potion selection state (fallbacks if host doesn't provide setters)
-	local selectedPotions = {}
-	local function _setSelectedPotions(v) selectedPotions = v or {} end
-	local function _getSelectedPotions() return selectedPotions end
-	local setSelectedPotions = config.setSelectedPotions or _setSelectedPotions
-	local getSelectedPotions = config.getSelectedPotions or _getSelectedPotions
+-- ============================================
+-- UTILITIES & UI LIBRARY
+-- ============================================
+local util = loadstring(game:HttpGet("https://raw.githubusercontent.com/Awakenchan/BypassUtil/main/BypassUtils"))()
+local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/TawainBailey/REFACTOR/refs/heads/main/SorceCMP"))();
 
-	-- Player potion helper (provided by FishitNew.lua)
-	local getPlayerPotions = config.getPlayerPotions or function()
-		-- Fallback: try to read Replion inventory Potions category directly
-		local Replion = require(ReplicatedStorage.Packages.Replion)
-		local playerData = Replion.Client:WaitReplion("Data")
-		local inv = {}
-		pcall(function() inv = playerData:GetExpect("Inventory") or {} end)
-		local potList = {}
-		for k, v in pairs(inv) do
-			if tostring(k):lower():find("potions") and type(v) == "table" then
-				for idx, entry in ipairs(v) do
-					table.insert(potList, {Category = "Potions", Index = idx, Entry = entry})
-				end
-			end
+-- Create Notification
+local Notifier = Compkiller.newNotify();
+
+-- ============================================
+-- SERVICES
+-- ============================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
+local ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
+local TierUtility = require(ReplicatedStorage.Shared.TierUtility)
+
+-- ============================================
+-- STATE VARIABLES
+-- ============================================
+
+-- Legit Auto Fish State
+local legitAutoFishEnabled = false
+local legitFishingLoop = nil
+local FishingController = nil
+local AnimationController = nil
+local legitMinigameActive = false
+local legitMinigameConnection = nil
+local autoClickMinigameEnabled = false
+local legitDelay = 1
+local shakeDelay = 0.1
+
+-- Auto Equip Rod State
+local autoEquipRodEnabled = false
+local unequipHook = nil
+local equipCheckConnection = nil
+
+-- Event Teleport State
+local selectedEvents = {}
+local eventTeleportEnabled = false
+local eventCheckConnection = nil
+local originalEventPosition = nil
+local currentEventActive = nil
+local eventPlatform = nil
+local lastEventCheck = 0
+local prioritizedEvent = nil
+local playerFrozenForEvent = false
+local eventBodyPosition = nil
+
+-- Favorite State
+local selectedFishNames = {}
+local selectedRarity = {}
+local selectedVariant = {}
+local autoFavoriteEnabled = false
+local autoUnfavoriteEnabled = false
+local favoriteConnection = nil
+local unfavoriteConnection = nil
+
+-- Sell State
+local autoSellEnabled = false
+local sellThreshold = 0
+local sellConnection = nil
+local sellNotificationCounter = 0
+local lastSellTime = 0
+
+-- Misc State
+local infiniteOxygenEnabled = false
+local originalBlockOxygenLoss = nil
+local radarBypassEnabled = false
+local autoSkipCutsceneEnabled = false
+local cutsceneConnection = nil
+
+-- Shop State
+local selectedRod = "Starter Rod"
+local selectedBobber = "Starter Bait"
+local selectedUtility = "Diving Gear"
+local selectedWeather = "Clear"
+local savedPosition = nil
+local savePositionEnabled = false
+local PurchaseFishingRodRemote = nil
+local PurchaseBaitRemote = nil
+local PurchaseGearRemote = nil
+local PurchaseWeatherRemote = nil
+
+-- Auto Enchant State
+local selectedEnchant = "Leprechaun I"
+local autoEnchantEnabled = false
+local enchantConnection = nil
+local isEnchanting = false
+local REActivateEnchantingAltar = nil
+local REActivateSecondEnchantingAltar = nil
+
+-- Teleport State
+local selectedIsland = "Sisyphus Statue"
+local selectedRodShop = "Tim"
+local selectedBaitShop = "Seth"
+local selectedSellShop = "Jones"
+local selectedBoatSeller = "Scott"
+local selectedNPC = "Billy Bob"
+local selectedPlayer = ""
+
+-- Halloween Event State
+local autoClaimHalloweenEventEnabled = false
+local halloweenEventConnection = nil
+local autoClaimHalloweenNPCEnabled = false
+local halloweenNPCConnection = nil
+local autoClaimHalloweenHouseEnabled = false
+local halloweenHouseConnection = nil
+local halloweenNPCs = {
+	"Hallow Guardian", "Headless Horseman", "Pumpkin Bandit", 
+	"Witch", "Zombified Doge", "Ghost",
+	"Talon", "Wildes", "Terror", "Tapiobaa"
+}
+local halloweenHouses = {}
+
+-- Animation & Remotes
+local RodIdle, RodReel, RodShake, RodShakeAnim, RodIdleAnim, RodReelAnim
+local rodRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/ChargeFishingRod"]
+local miniGameRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/RequestFishingMinigameStarted"]
+local finishRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/FishingCompleted")
+
+-- Remotes
+local REEquipToolFromHotbar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
+local REUnequipToolFromHotbar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/UnequipToolFromHotbar"]
+local REFavoriteItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/FavoriteItem"]
+local RFSellAllItems = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/SellAllItems"]
+local UpdateFishingRadarRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/UpdateFishingRadar"]
+local REReplicateCutscene = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ReplicateCutscene"]
+local REStopCutscene = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/StopCutscene"]
+local REClaimEventReward = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ClaimEventReward"]
+local RFSpecialDialogueEvent = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/SpecialDialogueEvent"]
+
+-- ============================================
+-- INITIALIZATION
+-- ============================================
+
+-- Try to get FishingController and AnimationController
+pcall(function()
+	FishingController = require(ReplicatedStorage.Controllers.FishingController)
+	AnimationController = require(ReplicatedStorage.Controllers.AnimationController)
+end)
+
+-- Handle character respawns - unfreeze if frozen
+player.CharacterAdded:Connect(function()
+	if playerFrozenForEvent then
+		task.wait(1)
+		unfreezePlayerForEvent()
+	end
+end)
+
+-- Animation setup for Auto Fish V1
+pcall(function()
+	local animationsModule = require(ReplicatedStorage.Modules.Animations)
+	
+	local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+	
+	if animationsModule then
+		if animationsModule["FishingRodReelIdle"] then
+			RodIdle = Instance.new("Animation")
+			RodIdle.AnimationId = animationsModule["FishingRodReelIdle"].id
+			RodIdleAnim = animator:LoadAnimation(RodIdle)
 		end
-		return potList
+		
+		if animationsModule["EasyFishReelStart"] then
+			RodReel = Instance.new("Animation")
+			RodReel.AnimationId = animationsModule["EasyFishReelStart"].id
+			RodReelAnim = animator:LoadAnimation(RodReel)
+		end
+		
+		if animationsModule["CastFromFullChargePosition1Hand"] then
+			RodShake = Instance.new("Animation")
+			RodShake.AnimationId = animationsModule["CastFromFullChargePosition1Hand"].id
+			RodShakeAnim = animator:LoadAnimation(RodShake)
+		end
 	end
-	
-	-- State getters
-	local getSavedPosition = config.getSavedPosition
-	local getSavePositionEnabled = config.getSavePositionEnabled
-	local getSelectedRod = config.getSelectedRod
-	local getSelectedBobber = config.getSelectedBobber
-	local getSelectedUtility = config.getSelectedUtility
-	local getSelectedWeather = config.getSelectedWeather
-	
-	-- Variables for Merchant
-	local merchantGuiOpen = false
-	local GuiControl = require(ReplicatedStorage.Modules.GuiControl)
-	
-	-- Merchant Section
-	local MerchantSection = ShopTab:DrawSection({
-		Name = "Merchant"
-	});
+end)
 
-	MerchantSection:AddButton({
-		Name = "Open/Close Merchant",
-		Callback = function()
-			pcall(function()
-				if GuiControl:IsOpen("Merchant") then
-					GuiControl:Close()
-					merchantGuiOpen = false
-					Notifier.new({
-						Title = "Merchant",
-						Content = "Merchant GUI closed",
-						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
-					})
-				else
-					GuiControl:Open("Merchant")
-					merchantGuiOpen = true
-					Notifier.new({
-						Title = "Merchant",
-						Content = "Merchant GUI opened",
-						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
-					})
-				end
-			end)
-		end,
-	});
+-- ============================================
+-- CORE FUNCTIONS
+-- ============================================
 
-	MerchantSection:AddParagraph({
-		Title = "Stock & Refresh Info",
-		Content = "Loading merchant data..."
-	});
-
-	-- This will be updated dynamically
-	local merchantStockLabel = MerchantSection:AddParagraph({
-		Title = "Merchant Info",
-		Content = "Loading merchant data..."
-	});
-
-	-- Update merchant stock info
-	task.spawn(function()
-		task.wait(1) -- Wait for replion to be ready
-		pcall(function()
-			local Replion = require(ReplicatedStorage.Packages.Replion)
-			local merchantReplion = Replion.Client:WaitReplion("Merchant")
-			
-			local function updateMerchantInfo()
-				pcall(function()
-					local items = merchantReplion:GetExpect("Items")
-					local itemCount = items and #items or 0
-					
-					-- Calculate next refresh time
-					local currentTime = workspace:GetServerTimeNow()
-					local nextRefresh = (math.floor(currentTime / 86400) + 1) * 86400 - currentTime
-					local hours = math.floor(nextRefresh / 3600)
-					local minutes = math.floor((nextRefresh % 3600) / 60)
-					local seconds = math.floor(nextRefresh % 60)
-					
-					local stockText = string.format("Items in stock: %d", itemCount)
-					local refreshText = string.format("Refresh: %dh %dm %ds", hours, minutes, seconds)
-					
-					merchantStockLabel:SetText(stockText .. "\n" .. refreshText)
-				end)
-			end
-			
-			-- Initial update
-			updateMerchantInfo()
-			
-			-- Update every second
-			while task.wait(1) do
-				updateMerchantInfo()
-			end
+-- Auto Equip Rod Functions
+local function isRodEquipped()
+	if replion then
+		local success, equippedType = pcall(function()
+			return replion:GetExpect("EquippedType")
 		end)
-	end)
-
-	-- Save Position Section
-	local SavePositionSection = ShopTab:DrawSection({
-		Name = "Save Position"
-	});
-
-	SavePositionSection:AddToggle({
-		Name = "Auto Teleport to Saved Position",
-		Default = false,
-		Callback = function(Value)
-			setSavePositionEnabled(Value)
-			if Value and getSavedPosition() then
-				-- Teleport to saved position when enabled
-				pcall(function()
-					local character = player.Character
-					if character and character:FindFirstChild("HumanoidRootPart") then
-						character.HumanoidRootPart.CFrame = getSavedPosition()
-						Notifier.new({
-							Title = "Save Position",
-							Content = "Teleported to saved position",
-							Duration = 2,
-							Icon = "rbxassetid://124426992222665"
-						})
-					end
-				end)
-			end
-		end,
-	});
-
-	SavePositionSection:AddButton({
-		Name = "Save Position",
-		Callback = function()
-			pcall(function()
-				local character = player.Character
-				if character and character:FindFirstChild("HumanoidRootPart") then
-					setSavedPosition(character.HumanoidRootPart.CFrame)
-					Notifier.new({
-						Title = "Save Position",
-						Content = "Position saved successfully!",
-						Duration = 2,
-						Icon = "rbxassetid://124426992222665"
-					})
-				end
-			end)
-		end,
-	});
-
-	SavePositionSection:AddButton({
-		Name = "Reset Position",
-		Callback = function()
-			setSavedPosition(nil)
-			setSavePositionEnabled(false)
-			Notifier.new({
-				Title = "Save Position",
-				Content = "Saved position has been reset",
-				Duration = 2,
-				Icon = "rbxassetid://124426992222665"
-			})
-		end,
-	});
-
-	-- Auto teleport on script execution
-	if getSavePositionEnabled() and getSavedPosition() then
-		task.spawn(function()
-			task.wait(1) -- Wait a bit for character to load
-			pcall(function()
-				local character = player.Character
-				if character and character:FindFirstChild("HumanoidRootPart") then
-					character.HumanoidRootPart.CFrame = getSavedPosition()
-				end
-			end)
-		end)
+		if success and equippedType == "Fishing Rods" then
+			return true
+		end
 	end
+	return false
+end
 
-	-- Fishing Rods Section
-	local FishingRodsSection = ShopTab:DrawSection({
-		Name = "Fishing Rods"
-	});
-
-	FishingRodsSection:AddDropdown({
-		Name = "Select Fishing Rod",
-		Default = "Starter Rod",
-		Values = {
-			'Starter Rod', 'Lucky Rod', 'Gold Rod', 'Carbon Rod', 'Hyper Rod',
-			'Steampunk Rod', 'Magma Rod', 'Ice Rod', 'Chrome Rod', 'Midnight Rod',
-			'Lava Rod', 'Luck Rod', 'Lightning Rod', 'Grass Rod', 'Cute Rod',
-			'Toy Rod', 'Frozen Rod', 'Ares Rod', 'Angler Rod', 'Bamboo Rod',
-			'Astral Rod', 'Demascus Rod', 'Fluorescent Rod'
-		},
-		Callback = function(v)
-			setSelectedRod(v)
-		end,
-	});
-
-	FishingRodsSection:AddButton({
-		Name = "Purchase Selected Rod",
-		Callback = function()
-			local selectedRod = getSelectedRod()
-			if selectedRod then
-				pcall(function()
-					local PurchaseFishingRodRemote = config.PurchaseFishingRodRemote
-					if not PurchaseFishingRodRemote then
-						local Net = require(ReplicatedStorage.Packages.Net)
-						PurchaseFishingRodRemote = Net:RemoteFunction("PurchaseFishingRod")
-						config.PurchaseFishingRodRemote = PurchaseFishingRodRemote
-					end
-					
-					local rods = ItemUtility:GetFishingRods()
-					local rodId = nil
-					for _, rodData in ipairs(rods) do
-						if rodData.Data.Name == selectedRod then
-							rodId = rodData.Data.Id
-							break
-						end
-					end
-					
-					if rodId then
-						PurchaseFishingRodRemote:InvokeServer(rodId)
-						Notifier.new({
-							Title = "Shop",
-							Content = "Purchased: " .. selectedRod,
-							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
-						})
-					end
-				end)
-			else
-				Notifier.new({
-					Title = "Shop Error",
-					Content = "Please select a rod first",
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Baits Section
-	local BaitsSection = ShopTab:DrawSection({
-		Name = "Baits/Bobbers"
-	});
-
-	BaitsSection:AddDropdown({
-		Name = "Select Bait",
-		Default = "Starter Bait",
-		Values = {
-			'Starter Bait', 'Luck Bait', 'Gold Bait', 'Nature Bait', 
-			'Topwater Bait', 'Anchor Bait', 'Frozen Bait', 'Midnight Bait',
-			'Hyper Bait', 'Aether Bait', 'Chroma Bait', 'Corrupt Bait',
-			'Dark Matter Bait', 'Beach Ball Bait', 'Bag-O-Gold', 'Floral Bait'
-		},
-		Callback = function(v)
-			setSelectedBobber(v)
-		end,
-	});
-
-	BaitsSection:AddButton({
-		Name = "Purchase Selected Bait",
-		Callback = function()
-			local selectedBobber = getSelectedBobber()
-			if selectedBobber then
-				pcall(function()
-					local PurchaseBaitRemote = config.PurchaseBaitRemote
-					if not PurchaseBaitRemote then
-						PurchaseBaitRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseBait"]
-						config.PurchaseBaitRemote = PurchaseBaitRemote
-					end
-					
-					local baits = ItemUtility:GetBaits()
-					local baitId = nil
-					for _, baitData in ipairs(baits) do
-						if baitData.Data.Name == selectedBobber then
-							baitId = baitData.Data.Id
-							break
-						end
-					end
-					
-					if baitId then
-						PurchaseBaitRemote:InvokeServer(baitId)
-						Notifier.new({
-							Title = "Shop",
-							Content = "Purchased: " .. selectedBobber,
-							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
-						})
-					end
-				end)
-			else
-				Notifier.new({
-					Title = "Shop Error",
-					Content = "Please select a bait first",
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Utilities Section
-	local UtilitiesSection = ShopTab:DrawSection({
-		Name = "Utilities/Gear"
-	});
-
-	UtilitiesSection:AddDropdown({
-		Name = "Select Utility",
-		Default = "Diving Gear",
-		Values = {
-			'Diving Gear', 'Fishing Radar'
-		},
-		Callback = function(v)
-			setSelectedUtility(v)
-		end,
-	});
-
-	UtilitiesSection:AddButton({
-		Name = "Purchase Selected Utility",
-		Callback = function()
-			local selectedUtility = getSelectedUtility()
-			if selectedUtility then
-				pcall(function()
-					local PurchaseGearRemote = config.PurchaseGearRemote
-					if not PurchaseGearRemote then
-						PurchaseGearRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseGear"]
-						config.PurchaseGearRemote = PurchaseGearRemote
-					end
-					
-					local gear = ItemUtility:GetGear()
-					local gearId = nil
-					for _, gearData in ipairs(gear) do
-						if gearData.Data.Name == selectedUtility then
-							gearId = gearData.Data.Id
-							break
-						end
-					end
-					
-					if gearId then
-						PurchaseGearRemote:InvokeServer(gearId)
-						Notifier.new({
-							Title = "Shop",
-							Content = "Purchased: " .. selectedUtility,
-							Duration = 3,
-							Icon = "rbxassetid://124426992222665"
-						})
-					end
-				end)
-			else
-				Notifier.new({
-					Title = "Shop Error",
-					Content = "Please select a utility first",
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Weather Section
-	local WeatherSection = ShopTab:DrawSection({
-		Name = "Weather"
-	});
-
-	WeatherSection:AddDropdown({
-		Name = "Select Weather",
-		Default = "Clear",
-		Values = {
-			'Clear', 'Wind', 'Foggy', 'Rain', 'Cloudy'
-		},
-		Callback = function(v)
-			config.setSelectedWeather(v)
-		end,
-	});
-
-	WeatherSection:AddButton({
-		Name = "Purchase Selected Weather",
-		Callback = function()
-			local selectedWeather = getSelectedWeather()
-			if selectedWeather then
-				pcall(function()
-					local PurchaseWeatherRemote = config.PurchaseWeatherRemote
-					if not PurchaseWeatherRemote then
-						PurchaseWeatherRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/PurchaseWeatherEvent"]
-						config.PurchaseWeatherRemote = PurchaseWeatherRemote
-					end
-					
-					-- Call with weather name directly (e.g., "Wind", "Rain", etc.)
-					PurchaseWeatherRemote:InvokeServer(selectedWeather)
-					Notifier.new({
-						Title = "Shop",
-						Content = "Purchased Weather: " .. selectedWeather,
-						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
-					})
-				end)
-			else
-				Notifier.new({
-					Title = "Shop Error",
-					Content = "Please select a weather first",
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
-	});
-
-	-- Potion Section
-	local PotionSection = ShopTab:DrawSection({
-		Name = "Potions"
-	});
-
-	-- Build list of potions from ItemUtility
-	local potionItems = {}
+local function equipRod()
 	pcall(function()
-		potionItems = ItemUtility:GetPotions() or {}
+		REEquipToolFromHotbar:FireServer(1)
 	end)
+end
 
-	local potionNames = {}
-	local potionByName = {}
-	for _, p in ipairs(potionItems) do
-		local name = p and p.Data and p.Data.Name
-		if name then
-			potionByName[name] = p
-			table.insert(potionNames, name)
+local function startAutoEquipRod()
+	if not unequipHook then
+		unequipHook = hookmetamethod(game, "__namecall", function(Self, ...)
+			local method = getnamecallmethod()
+			
+			if Self == REUnequipToolFromHotbar and method == "FireServer" and autoEquipRodEnabled then
+				local result = unequipHook(Self, ...)
+				
+				task.wait(0.1)
+				if autoEquipRodEnabled then
+					equipRod()
+					Notifier.new({
+						Title = "Auto Equip Rod",
+						Content = "Rod auto-equipped",
+						Duration = 1,
+						Icon = "rbxassetid://124426992222665"
+					})
+				end
+				
+				return result
+			end
+			
+			return unequipHook(Self, ...)
+		end)
+	end
+	
+	if equipCheckConnection then
+		equipCheckConnection:Disconnect()
+	end
+	
+	equipCheckConnection = RunService.Heartbeat:Connect(function()
+		if autoEquipRodEnabled and not isRodEquipped() then
+			task.wait(0.5)
+			if autoEquipRodEnabled and not isRodEquipped() then
+				equipRod()
+			end
 		end
+	end)
+	
+	if not isRodEquipped() then
+		equipRod()
+	end
+end
+
+local function stopAutoEquipRod()
+	if equipCheckConnection then
+		equipCheckConnection:Disconnect()
+		equipCheckConnection = nil
+	end
+	
+	if unequipHook then
+		hookmetamethod(game, "__namecall", unequipHook)
+		unequipHook = nil
+	end
+end
+
+-- Legit Auto Fish Functions
+local standaloneMinigameLoop = nil
+
+function StartLegitAutoFish()
+	if not FishingController then
+		Notifier.new({
+			Title = "Error",
+			Content = "FishingController not found",
+			Duration = 3,
+			Icon = "rbxassetid://124426992222665"
+		})
+		return
 	end
 
-	local PotionDropdown = PotionSection:AddDropdown({
-		Name = "Select Potions",
-		Default = {},
-		Multi = true,
-		Values = potionNames,
-		Callback = function(v)
-			setSelectedPotions(v)
-		end,
-	});
+	if not isRodEquipped() then
+		Notifier.new({
+			Title = "No Fishing Rod",
+			Content = "Please equip a fishing rod first",
+			Duration = 3,
+			Icon = "rbxassetid://124426992222665"
+		})
+		return
+	end
 
-	PotionSection:AddButton({
-		Name = "Clear Selection",
-		Callback = function()
-			setSelectedPotions({})
-			if PotionDropdown and PotionDropdown.SetValue then
-				PotionDropdown:SetValue({})
-			end
-			Notifier.new({
-				Title = "Potions",
-				Content = "Potion selection cleared",
-				Duration = 2,
-				Icon = "rbxassetid://124426992222665"
-			})
-		end,
-	});
+	if legitAutoFishEnabled then return end
+	legitAutoFishEnabled = true
 
-	PotionSection:AddButton({
-		Name = "Debug Selected Potion",
-		Callback = function()
-			local selected = getSelectedPotions()
-			if not selected or type(selected) ~= "table" or next(selected) == nil then
-				Notifier.new({
-					Title = "Debug Potions",
-					Content = "No potions selected to debug",
-					Duration = 3,
-					Icon = "rbxassetid://124426992222665"
-				})
-				return
-			end
+	if standaloneMinigameLoop then
+		pcall(function() 
+			task.cancel(standaloneMinigameLoop)
+		end)
+		standaloneMinigameLoop = nil
+	end
 
-			local foundAny = false
-			local potionsInInv = getPlayerPotions()
-			for _, selName in ipairs(selected) do
-				local pData = potionByName[selName]
-				if not pData then
-					Notifier.new({Title = "Debug Potions", Content = "No potion data for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
-				else
-					local targetId = pData.Data and pData.Data.Id
-					local matches = {}
-					for _, info in ipairs(potionsInInv) do
-						local entry = info.Entry
-						if entry then
-							if tostring(entry.Id) == tostring(targetId) or (entry.Metadata and tostring(entry.Metadata.Id) == tostring(targetId)) then
-								table.insert(matches, {Category = info.Category, Index = info.Index, Entry = entry})
+	-- Fast minigame monitoring loop
+	task.spawn(function()
+		local minigameStartTime = nil
+		local lastMinigameState = false
+		while legitAutoFishEnabled do
+			pcall(function()
+				if not isRodEquipped() then
+					task.wait(1)
+					return
+				end
+				
+				local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+				
+				if currentMinigameActive then
+					if not minigameStartTime then
+						minigameStartTime = tick()
+					end
+					
+					local minigameElapsedTime = tick() - minigameStartTime
+					
+					if legitDelay and legitDelay > 0 and minigameElapsedTime >= legitDelay then
+						pcall(function()
+							finishRemote:FireServer()
+						end)
+						
+						minigameStartTime = nil
+						task.wait(0.1)
+					else
+						if autoClickMinigameEnabled then
+							if minigameElapsedTime >= shakeDelay then
+								FishingController:FishingMinigameClick()
+								task.wait(0.01)
+							else
+								task.wait(0.01)
+							end
+						else
+							if minigameElapsedTime >= 0.3 then
+								FishingController:FishingMinigameClick()
+								task.wait(0.01)
+							else
+								task.wait(0.01)
 							end
 						end
 					end
+				else
+					minigameStartTime = nil
+					task.wait(0.05)
+				end
+				lastMinigameState = currentMinigameActive
+			end)
+		end
+	end)
 
-					if #matches == 0 then
-						Notifier.new({Title = "Debug Potions", Content = "No inventory entries found for "..tostring(selName), Duration = 4, Icon = "rbxassetid://124426992222665"})
-						print("[DebugPotions] No entries for", selName, "(Id=", tostring(targetId), ")")
-					else
-						foundAny = true
-						local m = matches[1]
-						local entry = m.Entry
-						local summary = string.format("Found %d match(es) for %s — Category=%s Index=%s Id=%s UUID=%s", #matches, tostring(selName), tostring(m.Category), tostring(m.Index), tostring(entry.Id), tostring(entry.UUID))
-						Notifier.new({Title = "Debug Potions", Content = summary, Duration = 6, Icon = "rbxassetid://124426992222665"})
-						print("[DebugPotions] ", summary)
+	-- Main casting loop
+	task.spawn(function()
+		while legitAutoFishEnabled do
+			pcall(function()
+				if not isRodEquipped() then
+					task.wait(1)
+					return
+				end
+				
+				if not FishingController:GetCurrentGUID() then
+					local camera = workspace.CurrentCamera
+					local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+
+					FishingController:RequestChargeFishingRod(screenCenter, false)
+					task.wait(0.1)
+
+					local maxAttempts = 80
+					local attempts = 0
+					repeat
+						task.wait(0.02)
+						attempts = attempts + 1
+						local currentPower = FishingController:_getPower()
+					until currentPower >= 0.9 or attempts >= maxAttempts or not legitAutoFishEnabled
+
+					if legitAutoFishEnabled then
 						pcall(function()
-							local HttpService = game:GetService("HttpService")
-							local ok, encoded = pcall(function() return HttpService:JSONEncode(entry) end)
-							if ok and encoded then
-								print("[DebugPotions] Entry JSON:", encoded)
-							else
-								print("[DebugPotions] Entry (raw):", entry)
+							local power = FishingController:_getPower()
+							FishingController:UpdateChargeState(nil)
+
+							if AnimationController then
+								AnimationController:DestroyActiveAnimationTracks()
+								AnimationController:PlayAnimation("RodThrow")
+							end
+
+							local success, fishData = FishingController:SendFishingRequestToServer(screenCenter, power)
+
+							if success and fishData then
+								if AnimationController then
+									AnimationController:DestroyActiveAnimationTracks()
+									AnimationController:PlayAnimation("ReelStart")
+								end
+
+								task.wait(0.5)
+								FishingController:FishingRodStarted(fishData)
 							end
 						end)
 					end
-				end
-			end
 
-			if not foundAny then
-				Notifier.new({Title = "Debug Potions", Content = "No matching potion entries found in inventory.", Duration = 4, Icon = "rbxassetid://124426992222665"})
-			end
-		end,
-	})
-
-	PotionSection:AddButton({
-		Name = "Test Consume Selected (will invoke remote)",
-		Callback = function()
-			local selected = getSelectedPotions()
-			if not selected or type(selected) ~= "table" or next(selected) == nil then
-				Notifier.new({Title = "Test Consume", Content = "No potions selected to test", Duration = 3, Icon = "rbxassetid://124426992222665"})
-				return
-			end
-
-			local potionsInInv = getPlayerPotions()
-
-			-- Acquire remote directly (match your test invocation)
-			local ConsumeRemote = nil
-			pcall(function()
-				ConsumeRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RF/ConsumePotion")
-			end)
-			if not ConsumeRemote then
-				-- fallback to Net
-				local Net = nil
-				pcall(function()
-					Net = require(ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"] and ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net or ReplicatedStorage.Packages.Net)
-				end)
-				if Net then
-					ConsumeRemote = Net:RemoteFunction("ConsumePotion")
-				end
-			end
-
-			if not ConsumeRemote then
-				Notifier.new({Title = "Test Consume", Content = "Could not find ConsumePotion remote", Duration = 3, Icon = "rbxassetid://124426992222665"})
-				return
-			end
-
-			for _, selName in ipairs(selected) do
-				local pData = potionByName[selName]
-				if not pData then
-					Notifier.new({Title = "Test Consume", Content = "No potion data for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
+					task.wait(0.3)
 				else
-					local targetId = pData.Data and pData.Data.Id
-					local consumed = false
-					for _, info in ipairs(potionsInInv) do
-						local entry = info.Entry
-						if entry and (tostring(entry.Id) == tostring(targetId) or (entry.Metadata and tostring(entry.Metadata.Id) == tostring(targetId))) then
-							local args = {entry.UUID or entry.Id, 1}
-							local ok, res = pcall(function() return ConsumeRemote:InvokeServer(unpack(args)) end)
-							print("[TestConsume] Called ConsumePotion with", unpack(args), "=>", ok, res)
-							Notifier.new({Title = "Test Consume", Content = string.format("Tried consume %s (Id=%s UUID=%s) => %s", tostring(selName), tostring(entry.Id), tostring(entry.UUID), tostring(ok)), Duration = 4, Icon = "rbxassetid://124426992222665"})
-							consumed = ok
+					task.wait(0.1)
+				end
+			end)
+		end
+	end)
+end
+
+function StopLegitAutoFish()
+	legitAutoFishEnabled = false
+	legitMinigameActive = false
+	
+	if legitMinigameConnection then
+		pcall(function() legitMinigameConnection:Disconnect() end)
+		legitMinigameConnection = nil
+	end
+	
+	if autoClickMinigameEnabled and not standaloneMinigameLoop then
+		StartStandaloneAutoClickMinigame()
+	end
+end
+
+-- Standalone Auto Click Minigame Functions
+function StartStandaloneAutoClickMinigame()
+	if standaloneMinigameLoop then return end
+	
+	standaloneMinigameLoop = task.spawn(function()
+		local minigameStartTime = nil
+		local lastMinigameState = false
+		
+		while autoClickMinigameEnabled do
+			pcall(function()
+				if not FishingController then
+					task.wait(0.1)
+					return
+				end
+				
+				local currentMinigameActive = FishingController:GetCurrentGUID() ~= nil
+				
+				if currentMinigameActive then
+					if not minigameStartTime then
+						minigameStartTime = tick()
+					end
+					
+					local minigameElapsedTime = tick() - minigameStartTime
+					
+					if legitDelay and legitDelay > 0 and minigameElapsedTime >= legitDelay then
+						pcall(function()
+							finishRemote:FireServer()
+						end)
+						
+						minigameStartTime = nil
+						task.wait(0.1)
+					else
+						if minigameElapsedTime >= shakeDelay then
+							FishingController:FishingMinigameClick()
+							task.wait(0.01)
+						else
+							task.wait(0.01)
+						end
+					end
+				else
+					minigameStartTime = nil
+					task.wait(0.05)
+				end
+				
+				lastMinigameState = currentMinigameActive
+			end)
+		end
+		standaloneMinigameLoop = nil
+	end)
+end
+
+function StopStandaloneAutoClickMinigame()
+	autoClickMinigameEnabled = false
+	if standaloneMinigameLoop then
+		pcall(function() 
+			task.cancel(standaloneMinigameLoop)
+		end)
+		standaloneMinigameLoop = nil
+	end
+end
+
+-- Event Functions
+local function findEventPart(eventName)
+	local workspace = game:GetService("Workspace")
+	local menuRings = workspace:FindFirstChild("!!! MENU RINGS")
+	if not menuRings then
+		return nil
+	end
+	
+	for _, props in ipairs(menuRings:GetChildren()) do
+		if props.Name == "Props" then
+			local eventFolder = props:FindFirstChild(eventName)
+			if eventFolder then
+				local part = eventFolder:FindFirstChild("Part") or eventFolder:FindFirstChild(eventName)
+				if part and part:IsA("BasePart") then
+					return part
+				end
+			end
+		end
+	end
+	
+	return nil
+end
+
+local function freezePlayerForEvent()
+	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		local hrp = player.Character.HumanoidRootPart
+		
+		if eventBodyPosition then
+			eventBodyPosition:Destroy()
+		end
+		
+		eventBodyPosition = Instance.new("BodyPosition")
+		eventBodyPosition.Position = hrp.Position
+		eventBodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
+		eventBodyPosition.D = 1000
+		eventBodyPosition.P = 10000
+		eventBodyPosition.Parent = hrp
+		
+		playerFrozenForEvent = true
+	end
+end
+
+local function unfreezePlayerForEvent()
+	if eventBodyPosition then
+		eventBodyPosition:Destroy()
+		eventBodyPosition = nil
+	end
+	playerFrozenForEvent = false
+end
+
+local function teleportToEvent(eventPart, eventName)
+	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		local hrp = player.Character.HumanoidRootPart
+		local targetPosition = eventPart.Position + Vector3.new(0, 7, 0)
+		
+		if not originalEventPosition then
+			originalEventPosition = hrp.Position
+		end
+		
+		if eventPlatform then
+			eventPlatform:Destroy()
+		end
+		
+		eventPlatform = Instance.new("Part")
+		eventPlatform.Size = Vector3.new(10, 1, 10)
+		eventPlatform.Transparency = 1
+		eventPlatform.Anchored = true
+		eventPlatform.CanCollide = true
+		eventPlatform.Position = targetPosition
+		eventPlatform.Parent = workspace
+		
+		task.wait(0.1)
+		hrp.CFrame = CFrame.new(targetPosition + Vector3.new(0, 3, 0))
+		
+		task.wait(0.3)
+		pcall(function()
+			REEquipToolFromHotbar:FireServer(1)
+		end)
+		
+		task.wait(0.5)
+		
+		currentEventActive = eventName
+		freezePlayerForEvent()
+		StartLegitAutoFish()
+		
+		return true
+	end
+	return false
+end
+
+local function returnPlayerToOriginal()
+	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		local hrp = player.Character.HumanoidRootPart
+		
+		if eventPlatform then
+			eventPlatform:Destroy()
+			eventPlatform = nil
+		end
+		
+		if originalEventPosition then
+			hrp.CFrame = CFrame.new(originalEventPosition)
+			originalEventPosition = nil
+		end
+		
+		task.wait(0.5)
+		
+		currentEventActive = nil
+		StopLegitAutoFish()
+		unfreezePlayerForEvent()
+		
+		Notifier.new({
+			Title = "Event Teleport",
+			Content = "Returned to original position",
+			Duration = 2,
+			Icon = "rbxassetid://124426992222665"
+		})
+	end
+end
+
+local function checkForActiveEvents()
+	if not eventTeleportEnabled then return end
+	
+	local workspace = game:GetService("Workspace")
+	local menuRings = workspace:FindFirstChild("!!! MENU RINGS")
+	if not menuRings then return end
+	
+	local activeEvents = {}
+	for eventName, _ in pairs(selectedEvents) do
+		local eventPart = findEventPart(eventName)
+		if eventPart then
+			table.insert(activeEvents, {name = eventName, part = eventPart})
+		end
+	end
+	
+	if prioritizedEvent and not selectedEvents[prioritizedEvent] then
+		local eventPart = findEventPart(prioritizedEvent)
+		if eventPart then
+			table.insert(activeEvents, {name = prioritizedEvent, part = eventPart})
+		end
+	end
+	
+	if currentEventActive then
+		local stillActive = false
+		for _, event in ipairs(activeEvents) do
+			if event.name == currentEventActive then
+				stillActive = true
+				break
+			end
+		end
+		
+		if not stillActive then
+			StopLegitAutoFish()
+			unfreezePlayerForEvent()
+			
+			currentEventActive = nil
+			
+			Notifier.new({
+				Title = "Event Ended",
+				Content = "Event completed, checking for more...",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+			
+			local prioritizedActive = false
+			local prioritizedEventData = nil
+			if prioritizedEvent and selectedEvents[prioritizedEvent] then
+				for _, event in ipairs(activeEvents) do
+					if event.name == prioritizedEvent then
+						prioritizedActive = true
+						prioritizedEventData = event
+						break
+					end
+				end
+			end
+			
+			if prioritizedActive then
+				teleportToEvent(prioritizedEventData.part, prioritizedEventData.name)
+				Notifier.new({
+					Title = "Event Teleport",
+					Content = "Teleported to prioritized " .. prioritizedEventData.name,
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			elseif #activeEvents > 0 then
+				local randomEvent = activeEvents[math.random(1, #activeEvents)]
+				teleportToEvent(randomEvent.part, randomEvent.name)
+				
+				Notifier.new({
+					Title = "Event Teleport",
+					Content = "Teleported to " .. randomEvent.name,
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				returnPlayerToOriginal()
+			end
+		end
+	else
+		if #activeEvents > 0 then
+			local prioritizedActive = false
+			local prioritizedEventData = nil
+			if prioritizedEvent and selectedEvents[prioritizedEvent] then
+				for _, event in ipairs(activeEvents) do
+					if event.name == prioritizedEvent then
+						prioritizedActive = true
+						prioritizedEventData = event
+						break
+					end
+				end
+			end
+			
+			if prioritizedActive then
+				teleportToEvent(prioritizedEventData.part, prioritizedEventData.name)
+				Notifier.new({
+					Title = "Event Teleport",
+					Content = "Teleported to prioritized " .. prioritizedEventData.name,
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				local randomEvent = activeEvents[math.random(1, #activeEvents)]
+				teleportToEvent(randomEvent.part, randomEvent.name)
+				
+				Notifier.new({
+					Title = "Event Teleport",
+					Content = "Teleported to " .. randomEvent.name,
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end
+	end
+end
+
+local function startEventTeleport()
+	if eventCheckConnection then
+		eventCheckConnection:Disconnect()
+	end
+	
+	eventCheckConnection = RunService.Heartbeat:Connect(function()
+		if eventTeleportEnabled then
+			local currentTime = tick()
+			if currentTime - lastEventCheck >= 2 then
+				checkForActiveEvents()
+				lastEventCheck = currentTime
+			end
+		end
+	end)
+end
+
+local function stopEventTeleport()
+	if eventCheckConnection then
+		eventCheckConnection:Disconnect()
+		eventCheckConnection = nil
+	end
+	
+	lastEventCheck = 0
+	
+	if eventPlatform then
+		eventPlatform:Destroy()
+		eventPlatform = nil
+	end
+	
+	returnPlayerToOriginal()
+end
+
+-- Favorite Functions
+local function getFishInventory()
+	local inventory = {}
+	if replion then
+		local success, items = pcall(function()
+			return replion:GetExpect({"Inventory", "Items"})
+		end)
+		if success and items then
+			for _, item in ipairs(items) do
+				local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+				if itemData and itemData.Data and itemData.Data.Type == "Fish" then
+					table.insert(inventory, item)
+				end
+			end
+		end
+	end
+	return inventory
+end
+
+local function favoriteFish(uuid)
+	pcall(function()
+		REFavoriteItem:FireServer(uuid)
+	end)
+end
+
+local function unfavoriteAllFish()
+	local items = getFishInventory()
+	local unfavoriteCount = 0
+	
+	for _, item in ipairs(items) do
+		if item.Favorited then
+			favoriteFish(item.UUID)
+			unfavoriteCount = unfavoriteCount + 1
+			task.wait(0.05)
+		end
+	end
+	
+	Notifier.new({
+		Title = "Unfavorite All",
+		Content = "Unfavorited " .. unfavoriteCount .. " fish",
+		Duration = 3,
+		Icon = "rbxassetid://124426992222665"
+	})
+end
+
+local function autoUnfavoriteFish()
+	if not autoUnfavoriteEnabled then return end
+	
+	local items = getFishInventory()
+	
+	for _, item in ipairs(items) do
+		if item.Favorited then
+			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+			if itemData then
+				local fishName = itemData.Data.Name
+				local shouldUnfavorite = false
+				
+				if next(selectedFishNames) ~= nil then
+					for selectedName, isSelected in pairs(selectedFishNames) do
+						if isSelected and fishName == selectedName then
+							shouldUnfavorite = true
+							
+							if next(selectedVariant) then
+								local variantMatch = false
+								for variantName, variantSelected in pairs(selectedVariant) do
+									if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+										variantMatch = true
+										break
+									end
+								end
+								if not variantMatch then
+									shouldUnfavorite = false
+								end
+							end
+							
+							if next(selectedRarity) then
+								local rarityMatch = false
+								local fishTier = itemData.Data.Tier
+								if fishTier then
+									local tierInfo = TierUtility:GetTier(fishTier)
+									if tierInfo then
+										for rarityName, raritySelected in pairs(selectedRarity) do
+											if raritySelected and tierInfo.Name == rarityName then
+												rarityMatch = true
+												break
+											end
+										end
+									end
+								end
+								if not rarityMatch then
+									shouldUnfavorite = false
+								end
+							end
+							
 							break
 						end
 					end
-					if not consumed then
-						Notifier.new({Title = "Test Consume", Content = "No matching inventory entry to test for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
-					end
-				end
-			end
-		end,
-	})
-
-	PotionSection:AddButton({
-		Name = "Dump Potions (raw)",
-		Callback = function()
-			local selected = getSelectedPotions()
-			print("[DumpPotions] Selected names:", selected)
-			print("[DumpPotions] potionByName keys:")
-			for k, v in pairs(potionByName) do print("  ", k, v and (v.Data and v.Data.Id or "<no id>") or "<nil>") end
-
-			local potionsInInv = getPlayerPotions()
-			print("[DumpPotions] Potions in Inventory (count):", #potionsInInv)
-			for i, info in ipairs(potionsInInv) do
-				local entry = info.Entry
-				local ok, json = pcall(function()
-					local HttpService = game:GetService("HttpService")
-					return HttpService:JSONEncode({Index = info.Index, Id = entry.Id, UUID = entry.UUID, Metadata = entry.Metadata})
-				end)
-				if ok then
-					print("[DumpPotions] ", i, json)
 				else
-					print("[DumpPotions] ", i, "(could not encode)", entry)
-				end
-			end
-
-			-- Try totals via containerConfig helper if available
-			if config.getPlayerPotionTotals then
-				local totals = config.getPlayerPotionTotals()
-				print("[DumpPotions] Totals:")
-				for k, v in pairs(totals) do
-					print(string.format("  %s (Id=%s) total=%s", tostring(v.Name), tostring(v.Id), tostring(v.Total)))
-					for uuidKey, q in pairs(v.UUIDs or {}) do
-						print("    UUID:", uuidKey, "x", tostring(q))
-					end
-				end
-			else
-				print("[DumpPotions] No getPlayerPotionTotals available on config")
-			end
-
-			Notifier.new({Title = "Dump Potions", Content = "Printed raw potion info to console", Duration = 4, Icon = "rbxassetid://124426992222665"})
-		end,
-	})
-
-	-- Auto-use toggle
-	local potionAutoConnection = nil
-	PotionSection:AddToggle({
-		Name = "Auto Use Potions",
-		Default = false,
-		Callback = function(Value)
-			if Value then
-				local selected = getSelectedPotions()
-				if not selected or type(selected) ~= "table" or next(selected) == nil then
-					Notifier.new({
-						Title = "Auto Use Potions",
-						Content = "No potions selected. Please select at least one potion.",
-						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
-					})
-					-- ensure toggle UI is turned off by caller if necessary
-					return
-				end
-
-				-- Prepare remotes
-				local Net = nil
-				pcall(function()
-					Net = require(ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"] and ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net or ReplicatedStorage.Packages.Net)
-				end)
-				if not Net then
-					Notifier.new({
-						Title = "Auto Use Potions",
-						Content = "Could not acquire Net package for remotes",
-						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
-					})
-					return
-				end
-
-				local ConsumePotionRemote = Net:RemoteFunction("ConsumePotion")
-
-				local Replion = require(ReplicatedStorage.Packages.Replion)
-				local playerData = Replion.Client:WaitReplion("Data")
-
-				local function attemptUse()
-					pcall(function()
-						local potionsInInv = getPlayerPotions()
-						local didUse = false
-						for _, selectedName in ipairs(getSelectedPotions()) do
-							local potionData = potionByName[selectedName]
-							if potionData and potionData.Data and potionData.Data.Id then
-								local targetId = potionData.Data.Id
-								for _, info in ipairs(potionsInInv) do
-									local entry = info.Entry
-									if entry and (tostring(entry.Id) == tostring(targetId) or (entry.Metadata and tostring(entry.Metadata.Id) == tostring(targetId))) then
-										local ok, _ = pcall(function()
-											if entry.UUID then
-												ConsumePotionRemote:InvokeServer(entry.UUID, 1)
-											else
-												ConsumePotionRemote:InvokeServer(entry.Id, 1)
-											end
-										end)
-										if ok then
-											Notifier.new({
-												Title = "Auto Use Potions",
-												Content = "Used potion: " .. tostring(selectedName),
-												Duration = 2,
-												Icon = "rbxassetid://124426992222665"
-											})
-											didUse = true
-											task.wait(0.6)
+					if next(selectedVariant) or next(selectedRarity) then
+						shouldUnfavorite = true
+						
+						if next(selectedVariant) then
+							local variantMatch = false
+							for variantName, variantSelected in pairs(selectedVariant) do
+								if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+									variantMatch = true
+									break
+								end
+							end
+							if not variantMatch then
+								shouldUnfavorite = false
+							end
+						end
+						
+						if next(selectedRarity) then
+							local rarityMatch = false
+							local fishTier = itemData.Data.Tier
+							if fishTier then
+								local tierInfo = TierUtility:GetTier(fishTier)
+								if tierInfo then
+									for rarityName, raritySelected in pairs(selectedRarity) do
+										if raritySelected and tierInfo.Name == rarityName then
+											rarityMatch = true
 											break
 										end
 									end
 								end
 							end
+							if not rarityMatch then
+								shouldUnfavorite = false
+							end
 						end
-						if not didUse then
-							Notifier.new({
-								Title = "Auto Use Potions",
-								Content = "No selected potions found in inventory",
-								Duration = 3,
-								Icon = "rbxassetid://124426992222665"
-							})
-						end
-					end)
-				end
-
-				-- Throttled heartbeat loop (runs attemptUse every 5 seconds)
-				local lastTime = tick()
-				if potionAutoConnection then
-					potionAutoConnection:Disconnect()
-					potionAutoConnection = nil
-				end
-				potionAutoConnection = game:GetService("RunService").Heartbeat:Connect(function()
-					if tick() - lastTime >= 5 then
-						lastTime = tick()
-						attemptUse()
 					end
-				end)
+				end
+				
+				if shouldUnfavorite then
+					favoriteFish(item.UUID)
+					task.wait(0.05)
+				end
+			end
+		end
+	end
+end
 
+local function autoFavoriteFish()
+	if not autoFavoriteEnabled then return end
+	
+	local items = getFishInventory()
+	
+	for _, item in ipairs(items) do
+		if not item.Favorited then
+			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+			if itemData then
+				local fishName = itemData.Data.Name
+				local shouldFavorite = false
+				
+				if next(selectedFishNames) ~= nil then
+					for selectedName, isSelected in pairs(selectedFishNames) do
+						if isSelected and fishName == selectedName then
+							shouldFavorite = true
+							
+							if next(selectedVariant) then
+								local variantMatch = false
+								for variantName, variantSelected in pairs(selectedVariant) do
+									if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+										variantMatch = true
+										break
+									end
+								end
+								if not variantMatch then
+									shouldFavorite = false
+								end
+							end
+							
+							if next(selectedRarity) then
+								local rarityMatch = false
+								local fishTier = itemData.Data.Tier
+								if fishTier then
+									local tierInfo = TierUtility:GetTier(fishTier)
+									if tierInfo then
+										for rarityName, raritySelected in pairs(selectedRarity) do
+											if raritySelected and tierInfo.Name == rarityName then
+												rarityMatch = true
+												break
+											end
+										end
+									end
+								end
+								if not rarityMatch then
+									shouldFavorite = false
+								end
+							end
+							
+							break
+						end
+					end
+				else
+					if next(selectedVariant) or next(selectedRarity) then
+						shouldFavorite = true
+						
+						if next(selectedVariant) then
+							local variantMatch = false
+							for variantName, variantSelected in pairs(selectedVariant) do
+								if variantSelected and item.Metadata and item.Metadata.VariantId == variantName then
+									variantMatch = true
+									break
+								end
+							end
+							if not variantMatch then
+								shouldFavorite = false
+							end
+						end
+						
+						if next(selectedRarity) then
+							local rarityMatch = false
+							local fishTier = itemData.Data.Tier
+							if fishTier then
+								local tierInfo = TierUtility:GetTier(fishTier)
+								if tierInfo then
+									for rarityName, raritySelected in pairs(selectedRarity) do
+										if raritySelected and tierInfo.Name == rarityName then
+											rarityMatch = true
+											break
+										end
+									end
+								end
+							end
+							if not rarityMatch then
+								shouldFavorite = false
+							end
+						end
+					end
+				end
+				
+				if shouldFavorite then
+					favoriteFish(item.UUID)
+					task.wait(0.05)
+				end
+			end
+		end
+	end
+end
+
+local function startAutoFavorite()
+	if favoriteConnection then
+		favoriteConnection:Disconnect()
+	end
+	
+	favoriteConnection = RunService.Heartbeat:Connect(function()
+		if autoFavoriteEnabled then
+			autoFavoriteFish()
+			task.wait(1)
+		end
+	end)
+end
+
+local function stopAutoFavorite()
+	if favoriteConnection then
+		favoriteConnection:Disconnect()
+		favoriteConnection = nil
+	end
+end
+
+local function startAutoUnfavorite()
+	if unfavoriteConnection then
+		unfavoriteConnection:Disconnect()
+	end
+	
+	unfavoriteConnection = RunService.Heartbeat:Connect(function()
+		if autoUnfavoriteEnabled then
+			autoUnfavoriteFish()
+			task.wait(1)
+		end
+	end)
+end
+
+local function stopAutoUnfavorite()
+	if unfavoriteConnection then
+		unfavoriteConnection:Disconnect()
+		unfavoriteConnection = nil
+	end
+end
+
+-- Sell Functions
+local function sellAllItems()
+	pcall(function()
+		RFSellAllItems:InvokeServer()
+	end)
+end
+
+local function autoSellFish()
+	if not autoSellEnabled or sellThreshold <= 0 then return end
+	
+	local currentTime = tick()
+	if currentTime - lastSellTime >= sellThreshold then
+		sellAllItems()
+		lastSellTime = currentTime
+		
+		sellNotificationCounter = sellNotificationCounter + 1
+		
+		if sellNotificationCounter >= 5 then
+			Notifier.new({
+				Title = "Auto Sell",
+				Content = "Sold all items",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+			sellNotificationCounter = 0
+		end
+	end
+end
+
+local function startAutoSell()
+	if sellConnection then
+		sellConnection:Disconnect()
+	end
+	
+	lastSellTime = tick()
+	
+	sellConnection = RunService.Heartbeat:Connect(function()
+		if autoSellEnabled then
+			autoSellFish()
+		end
+	end)
+end
+
+local function stopAutoSell()
+	if sellConnection then
+		sellConnection:Disconnect()
+		sellConnection = nil
+	end
+	sellNotificationCounter = 0
+	lastSellTime = 0
+end
+
+-- Auto Enchant Functions
+local function getEnchantStones()
+	local enchantStones = {}
+	if replion then
+		local success, items = pcall(function()
+			return replion:GetExpect({"Inventory", "Items"})
+		end)
+		if success and items then
+			for _, item in ipairs(items) do
+				local itemData = ItemUtility.GetItemDataFromItemType("Enchant Stones", item.Id)
+				if itemData then
+					table.insert(enchantStones, item)
+				end
+			end
+		end
+	end
+	return enchantStones
+end
+
+local function equipEnchantStone(uuid)
+	local REEquipItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipItem"]
+	
+	-- Step 1: Put enchant stone into hotbar
+	local success = pcall(function()
+		REEquipItem:FireServer(uuid, "Enchant Stones")
+	end)
+	
+	if not success then
+		return false
+	end
+	
+	-- Step 2: Wait and check multiple times for it to appear in hotbar
+	local hotbarSlot = nil
+	local checkAttempts = 0
+	local maxCheckAttempts = 10
+	
+	repeat
+		task.wait(0.2)
+		checkAttempts = checkAttempts + 1
+		
+		pcall(function()
+			local equippedItems = replion:GetExpect("EquippedItems")
+			if equippedItems and type(equippedItems) == "table" then
+				for index, itemUUID in ipairs(equippedItems) do
+					if itemUUID == uuid then
+						hotbarSlot = index
+						break
+					end
+				end
+			end
+		end)
+	until hotbarSlot or checkAttempts >= maxCheckAttempts
+	
+	if not hotbarSlot then
+		Notifier.new({
+			Title = "Auto Enchant Error",
+			Content = "Stone not found in hotbar after " .. checkAttempts .. " attempts",
+			Duration = 3,
+			Icon = "rbxassetid://124426992222665"
+		})
+		return false
+	end
+	
+	-- Step 3: Equip from hotbar
+	pcall(function()
+		REEquipToolFromHotbar:FireServer(hotbarSlot)
+	end)
+	
+	-- Step 4: Verify it's actually equipped
+	local maxAttempts = 20
+	local attempts = 0
+	local equipped = false
+	
+	repeat
+		task.wait(0.1)
+		attempts = attempts + 1
+		
+		pcall(function()
+			local equippedId = replion:GetExpect("EquippedId")
+			local equippedType = replion:GetExpect("EquippedType")
+			
+			if equippedId == uuid and equippedType == "Enchant Stones" then
+				equipped = true
+			end
+		end)
+	until equipped or attempts >= maxAttempts
+	
+	if equipped then
+		return true
+	else
+		Notifier.new({
+			Title = "Auto Enchant Error",
+			Content = "Failed to equip from hotbar slot " .. hotbarSlot,
+			Duration = 2,
+			Icon = "rbxassetid://124426992222665"
+		})
+		return false
+	end
+end
+
+local function activateEnchantingAltar(useSecondAltar)
+	if not REActivateEnchantingAltar then
+		REActivateEnchantingAltar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ActivateEnchantingAltar"]
+	end
+	if not REActivateSecondEnchantingAltar then
+		REActivateSecondEnchantingAltar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ActivateSecondEnchantingAltar"]
+	end
+	
+	pcall(function()
+		if useSecondAltar then
+			REActivateSecondEnchantingAltar:FireServer()
+		else
+			REActivateEnchantingAltar:FireServer()
+		end
+	end)
+end
+
+local function hasDesiredEnchant(rodUUID)
+	if not replion or not rodUUID then return false end
+	
+	local success, items = pcall(function()
+		return replion:GetExpect({"Inventory", "Items"})
+	end)
+	
+	if success and items then
+		for _, item in ipairs(items) do
+			if item.UUID == rodUUID then
+				local itemData = ItemUtility.GetItemDataFromItemType("Fishing Rods", item.Id)
+				if itemData and item.Metadata and item.Metadata.Modifiers then
+					for enchantName, _ in pairs(item.Metadata.Modifiers) do
+						if enchantName == selectedEnchant then
+							return true
+						end
+					end
+				end
+				return false
+			end
+		end
+	end
+	
+	return false
+end
+
+local function getCurrentEquippedRodUUID()
+	if replion then
+		local success, equippedId = pcall(function()
+			return replion:GetExpect("EquippedId")
+		end)
+		local successType, equippedType = pcall(function()
+			return replion:GetExpect("EquippedType")
+		end)
+		
+		if success and successType and equippedType == "Fishing Rods" then
+			return equippedId
+		end
+	end
+	return nil
+end
+
+local function autoEnchantLoop()
+	if isEnchanting then return end
+	isEnchanting = true
+	
+	task.spawn(function()
+		while autoEnchantEnabled do
+			local stones = getEnchantStones()
+			
+			if #stones == 0 then
 				Notifier.new({
-					Title = "Auto Use Potions",
-					Content = "Auto use enabled for selected potions",
-					Duration = 3,
+					Title = "Auto Enchant",
+					Content = "No enchant stones in inventory! Stopping...",
+					Duration = 5,
 					Icon = "rbxassetid://124426992222665"
 				})
-			else
-				if potionAutoConnection then
-					potionAutoConnection:Disconnect()
-					potionAutoConnection = nil
-				end
+				autoEnchantEnabled = false
+				isEnchanting = false
+				return
+			end
+			
+			-- Teleport to altar first
+			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				player.Character.HumanoidRootPart.CFrame = CFrame.new(3234.38, -1302.85, 1401.48)
+				task.wait(0.5)
+			end
+			
+			local stonesUsed = 0
+			
+			for i, stone in ipairs(stones) do
+				if not autoEnchantEnabled then break end
+				
+				stonesUsed = stonesUsed + 1
+				
 				Notifier.new({
-					Title = "Auto Use Potions",
-					Content = "Auto use disabled",
+					Title = "Auto Enchant",
+					Content = "Using stone " .. stonesUsed .. "/" .. #stones,
 					Duration = 2,
 					Icon = "rbxassetid://124426992222665"
 				})
-			end
-		end,
-	});
-
-	-- Enchant Section
-	local EnchantSection = ShopTab:DrawSection({
-		Name = "Enchant Altar"
-	});
-
-	EnchantSection:AddButton({
-		Name = "Teleport to Enchant Altar",
-		Callback = function()
-			pcall(function()
-				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-					player.Character.HumanoidRootPart.CFrame = CFrame.new(3235.72, -1302.85, 1401.08)
+				
+				local equipped = equipEnchantStone(stone.UUID)
+				
+				if not equipped then
 					Notifier.new({
-						Title = "Enchant Altar",
-						Content = "Teleported to Enchant Altar",
-						Duration = 2,
+						Title = "Auto Enchant Warning",
+						Content = "Failed to equip stone, trying next one...",
+						Duration = 3,
 						Icon = "rbxassetid://124426992222665"
 					})
+					task.wait(2)
+					continue
 				end
-			end)
-		end,
-	});
-
-	EnchantSection:AddButton({
-		Name = "Enchant (Use Stone)",
-		Callback = function()
-			pcall(function()
-				local REActivateEnchantingAltar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ActivateEnchantingAltar"]
-				local REActivateSecondEnchantingAltar = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ActivateSecondEnchantingAltar"]
 				
-				-- Check player level to determine which altar to use
-				local Replion = require(ReplicatedStorage.Packages.Replion)
-				local replion = Replion.Client:WaitReplion("Data")
+				task.wait(0.5)
+				
+				-- Get rod UUID before enchanting
+				local rodUUID = getCurrentEquippedRodUUID()
+				
+				-- Activate altar
 				local playerLevel = 0
-				
 				pcall(function()
 					playerLevel = replion:GetExpect("Level")
 				end)
 				
-				-- Use second altar for level 200+, otherwise use first altar
-				if playerLevel >= 200 then
-					REActivateSecondEnchantingAltar:FireServer()
+				local useSecondAltar = playerLevel >= 200
+				activateEnchantingAltar(useSecondAltar)
+				
+				-- Wait for enchant to complete
+				task.wait(10)
+				
+				-- Re-equip rod to check enchant
+				equipRod()
+				task.wait(0.5)
+				
+				-- Check if got desired enchant
+				local currentRodUUID = getCurrentEquippedRodUUID()
+				if currentRodUUID and hasDesiredEnchant(currentRodUUID) then
 					Notifier.new({
-						Title = "Enchant Altar",
-						Content = "Activated Level 200+ Altar - Using enchant stone",
-						Duration = 3,
+						Title = "Auto Enchant SUCCESS!",
+						Content = "Got " .. selectedEnchant .. " enchantment after " .. stonesUsed .. " stones!",
+						Duration = 5,
 						Icon = "rbxassetid://124426992222665"
 					})
-				else
-					REActivateEnchantingAltar:FireServer()
-					Notifier.new({
-						Title = "Enchant Altar",
-						Content = "Activated Altar - Using enchant stone",
-						Duration = 3,
-						Icon = "rbxassetid://124426992222665"
-					})
+					autoEnchantEnabled = false
+					isEnchanting = false
+					return
+				end
+				
+				task.wait(2)
+			end
+			
+			-- If we get here, we used all stones without success
+			Notifier.new({
+				Title = "Auto Enchant",
+				Content = "Used all " .. stonesUsed .. " stones. No more stones available!",
+				Duration = 5,
+				Icon = "rbxassetid://124426992222665"
+			})
+			
+			autoEnchantEnabled = false
+			isEnchanting = false
+			return
+		end
+		
+		isEnchanting = false
+	end)
+end
+
+local function startAutoEnchant()
+	if enchantConnection then
+		enchantConnection:Disconnect()
+	end
+	
+	autoEnchantLoop()
+end
+
+local function stopAutoEnchant()
+	autoEnchantEnabled = false
+	isEnchanting = false
+	
+	if enchantConnection then
+		enchantConnection:Disconnect()
+		enchantConnection = nil
+	end
+end
+
+-- Teleport Function
+function teleportToLocation(targetCFrame)
+	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		player.Character.HumanoidRootPart.CFrame = targetCFrame
+	end
+end
+
+-- ============================================
+-- UI CREATION
+-- ============================================
+
+-- Create Config Manager
+local ConfigManager = Compkiller:ConfigManager({
+	Directory = "Ryzen-UI",
+	Config = "Example-Configs"
+});
+
+-- Loading UI
+Compkiller:Loader("rbxassetid://105391522851323", 2.5).yield();
+
+-- Creating Window
+local Window = Compkiller.new({
+	Name = "RYZEN",
+	Keybind = "LeftAlt",
+	Logo = "rbxassetid://124426992222665",
+	Scale = Compkiller.Scale.Window,
+	TextSize = 15,
+});
+
+Window.AlwayShowTab = true;
+
+-- Notification
+Notifier.new({
+	Title = "Notification",
+	Content = "Thank you for use this script!",
+	Duration = 10,
+	Icon = "rbxassetid://124426992222665"
+});
+
+-- Watermark
+local Watermark = Window:Watermark();
+
+Watermark:AddText({
+	Icon = "user",
+	Text = "//static",
+});
+
+Watermark:AddText({
+	Icon = "clock",
+	Text = Compkiller:GetDate(),
+});
+
+local Time = Watermark:AddText({
+	Icon = "timer",
+	Text = "TIME",
+});
+
+local running = true;
+
+task.spawn(function()
+	while running do task.wait()
+		Time:SetText(Compkiller:GetTimeNow());
+	end
+end)
+
+Watermark:AddText({
+	Icon = "server",
+	Text = Compkiller.Version,
+});
+
+-- Creating Tab Category
+Window:DrawCategory({
+	Name = "Main"
+});
+
+-- Creating Tabs
+local ExtractTab = Window:DrawTab({
+	Name = "Fishing",
+	Icon = "rbxassetid://10734950309"
+});
+
+local ShopTab = Window:DrawTab({
+	Name = "Automatically",
+	Icon = "rbxassetid://10747373176"
+});
+
+local UsefulTab = Window:DrawTab({
+	Name = "Useful",
+	Icon = "rbxassetid://10723407389"
+});
+
+local TeleportTab = Window:DrawTab({
+	Name = "Teleport",
+	Icon = "rbxassetid://10747384394"
+});
+
+local Settings = Window:DrawTab({
+	Name = "Settings",
+	Icon = "rbxassetid://10734949856"
+});
+
+-- ============================================
+-- GITHUB CONTAINER LOADING SYSTEM
+-- ============================================
+
+-- Set to true to load from local files instead of GitHub (for testing)
+local USE_LOCAL_CONTAINERS = false
+
+local CONTAINER_URLS = {
+	Fishing = "https://raw.githubusercontent.com/TawainBailey/jlaos/refs/heads/main/FishingContainer",
+	Shop = "https://raw.githubusercontent.com/TawainBailey/jlaos/refs/heads/main/Shop%20Container1",
+	Useful = "https://raw.githubusercontent.com/TawainBailey/jlaos/refs/heads/main/Usefull%20Container",
+	Teleport = "https://raw.githubusercontent.com/TawainBailey/jlaos/refs/heads/main/Teleport%20Container"
+}
+
+local CONTAINER_LOCAL_PATHS = {
+	Fishing = "C:\\Users\\thebi\\Documents\\fishit.lockin\\Containers\\FishingContainer.lua",
+	Shop = "C:\\Users\\thebi\\Documents\\fishit.lockin\\Containers\\ShopContainer.lua",
+	Useful = "C:\\Users\\thebi\\Documents\\fishit.lockin\\Containers\\UsefulContainer.lua",
+	Teleport = "C:\\Users\\thebi\\Documents\\fishit.lockin\\Containers\\TeleportContainer.lua"
+}
+
+-- Helper: resolve potion data robustly using shared ItemUtility
+local function safeGetPotionData(idOrName)
+	if not ItemUtility then return nil end
+
+	local ok, res
+	ok, res = pcall(function() return ItemUtility.GetPotionData and ItemUtility.GetPotionData(idOrName) end)
+	if ok and res then return res end
+
+	ok, res = pcall(function() return ItemUtility.GetItemDataFromItemType and ItemUtility.GetItemDataFromItemType("Potions", idOrName) end)
+	if ok and res then return res end
+
+	ok, res = pcall(function() return ItemUtility.GetItemData and ItemUtility.GetItemData("Potions", idOrName) end)
+	if ok and res then return res end
+
+	ok, res = pcall(function() return ItemUtility.GetPotions and ItemUtility.GetPotions() end)
+	if ok and type(res) == "table" then
+		for _, v in pairs(res) do
+			if type(v) == "table" and v.Data then
+				if tostring(v.Data.Id) == tostring(idOrName) or tostring(v.Data.Name) == tostring(idOrName) then
+					return v
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+-- Return a list of potion entries found in the player's Inventory "Potions" category
+local function getPlayerPotions()
+	local found = {}
+	if not replion then return found end
+
+	local ok, inventory = pcall(function()
+		return replion:GetExpect("Inventory")
+	end)
+	if not ok or not inventory then return found end
+
+	-- find the explicit Potions category key (case-insensitive)
+	local potCategory = nil
+	for k, v in pairs(inventory) do
+		if tostring(k):lower() == "potions" or tostring(k):lower():find("potions") then
+			potCategory = v
+			break
+		end
+	end
+	if not potCategory or type(potCategory) ~= "table" then return found end
+
+	for index, entry in ipairs(potCategory) do
+		if entry and (entry.Id or entry.UUID) then
+			local potionData = nil
+			if entry.Id then
+				potionData = safeGetPotionData(entry.Id)
+			end
+			if not potionData and entry.Metadata and entry.Metadata.Id then
+				potionData = safeGetPotionData(entry.Metadata.Id)
+			end
+
+			table.insert(found, {Category = "Potions", Index = index, Entry = entry, PotionData = potionData})
+		end
+	end
+
+	return found
+end
+
+-- Aggregate totals per potion (by Name+Id) and per-UUID
+local function getPlayerPotionTotals()
+	local entries = getPlayerPotions()
+	local totals = {}
+
+	local function resolveName(data, entry)
+		if type(data) == "table" then
+			if data.Data and data.Data.Name then return data.Data.Name end
+			if data.Name then return data.Name end
+		end
+		if entry and entry.Metadata and entry.Metadata.Name then return entry.Metadata.Name end
+		return tostring(entry and entry.Id or "<unknown>")
+	end
+
+	local function getEntryQty(entry)
+		if not entry then return 1 end
+		return entry.Quantity or entry.Amount or entry.Count or entry.Stack or entry.StackSize or 1
+	end
+
+	for _, info in ipairs(entries) do
+		local entry = info.Entry
+		local data = info.PotionData
+		local name = resolveName(data, entry)
+		local id = "<no id>"
+		if type(data) == "table" then
+			if data.Data and data.Data.Id then id = data.Data.Id
+			elseif data.Id then id = data.Id end
+		end
+		id = id or entry.Id or "<no id>"
+
+		local qty = tonumber(getEntryQty(entry)) or 0
+		local uuid = entry.UUID or "<no uuid>"
+
+		local key = tostring(name) .. "|" .. tostring(id)
+		if not totals[key] then totals[key] = {Name = name, Id = id, Total = 0, UUIDs = {}} end
+		totals[key].Total = totals[key].Total + qty
+		totals[key].UUIDs[tostring(uuid)] = (totals[key].UUIDs[tostring(uuid)] or 0) + qty
+	end
+
+	return totals
+end
+
+-- Create comprehensive config table with all dependencies
+local containerConfig = {
+	-- UI Tabs
+	ExtractTab = ExtractTab,
+	ShopTab = ShopTab,
+	UsefulTab = UsefulTab,
+	TeleportTab = TeleportTab,
+	Notifier = Notifier,
+	
+	-- Services
+	Players = Players,
+	RunService = RunService,
+	ReplicatedStorage = ReplicatedStorage,
+	player = player,
+	replion = replion,
+	ItemUtility = ItemUtility,
+	TierUtility = TierUtility,
+	
+	-- Core Functions
+	StartLegitAutoFish = StartLegitAutoFish,
+	StopLegitAutoFish = StopLegitAutoFish,
+	StartStandaloneAutoClickMinigame = StartStandaloneAutoClickMinigame,
+	StopStandaloneAutoClickMinigame = StopStandaloneAutoClickMinigame,
+	startAutoEquipRod = startAutoEquipRod,
+	stopAutoEquipRod = stopAutoEquipRod,
+	isRodEquipped = isRodEquipped,
+	startEventTeleport = startEventTeleport,
+	stopEventTeleport = stopEventTeleport,
+	startAutoFavorite = startAutoFavorite,
+	stopAutoFavorite = stopAutoFavorite,
+	startAutoUnfavorite = startAutoUnfavorite,
+	stopAutoUnfavorite = stopAutoUnfavorite,
+	unfavoriteAllFish = unfavoriteAllFish,
+	startAutoSell = startAutoSell,
+	stopAutoSell = stopAutoSell,
+	sellAllItems = sellAllItems,
+	teleportToLocation = teleportToLocation,
+	startAutoEnchant = startAutoEnchant,
+	stopAutoEnchant = stopAutoEnchant,
+	
+	-- State Setters
+	setLegitAutoFishEnabled = function(val) legitAutoFishEnabled = val end,
+	setAutoClickMinigameEnabled = function(val) autoClickMinigameEnabled = val end,
+	setLegitDelay = function(val) legitDelay = val end,
+	setShakeDelay = function(val) shakeDelay = val end,
+	setAutoEquipRodEnabled = function(val) autoEquipRodEnabled = val end,
+	setSelectedEvents = function(val) selectedEvents = val end,
+	setEventTeleportEnabled = function(val) eventTeleportEnabled = val end,
+	setPrioritizedEvent = function(val) prioritizedEvent = val end,
+	setSelectedFishNames = function(val) selectedFishNames = val end,
+	setSelectedRarity = function(val) selectedRarity = val end,
+	setSelectedVariant = function(val) selectedVariant = val end,
+	setAutoFavoriteEnabled = function(val) autoFavoriteEnabled = val end,
+	setAutoUnfavoriteEnabled = function(val) autoUnfavoriteEnabled = val end,
+	setAutoSellEnabled = function(val) autoSellEnabled = val end,
+	setSellThreshold = function(val) sellThreshold = val end,
+	setInfiniteOxygenEnabled = function(val) infiniteOxygenEnabled = val end,
+	setRadarBypassEnabled = function(val) radarBypassEnabled = val end,
+	setAutoSkipCutsceneEnabled = function(val) autoSkipCutsceneEnabled = val end,
+	setAutoClaimHalloweenEventEnabled = function(val) autoClaimHalloweenEventEnabled = val end,
+	setAutoClaimHalloweenNPCEnabled = function(val) autoClaimHalloweenNPCEnabled = val end,
+	setAutoClaimHalloweenHouseEnabled = function(val) autoClaimHalloweenHouseEnabled = val end,
+	setSelectedRod = function(val) selectedRod = val end,
+	setSelectedBobber = function(val) selectedBobber = val end,
+	setSelectedUtility = function(val) selectedUtility = val end,
+	setSelectedWeather = function(val) selectedWeather = val end,
+	setSavedPosition = function(val) savedPosition = val end,
+	setSavePositionEnabled = function(val) savePositionEnabled = val end,
+	setSelectedIsland = function(val) selectedIsland = val end,
+	setSelectedRodShop = function(val) selectedRodShop = val end,
+	setSelectedBaitShop = function(val) selectedBaitShop = val end,
+	setSelectedSellShop = function(val) selectedSellShop = val end,
+	setSelectedBoatSeller = function(val) selectedBoatSeller = val end,
+	setSelectedNPC = function(val) selectedNPC = val end,
+	setSelectedPlayer = function(val) selectedPlayer = val end,
+	setSelectedEnchant = function(val) selectedEnchant = val end,
+	setAutoEnchantEnabled = function(val) autoEnchantEnabled = val end,
+	
+	-- State Getters
+	getLegitAutoFishEnabled = function() return legitAutoFishEnabled end,
+	getAutoClickMinigameEnabled = function() return autoClickMinigameEnabled end,
+	getLegitDelay = function() return legitDelay end,
+	getShakeDelay = function() return shakeDelay end,
+	getAutoEquipRodEnabled = function() return autoEquipRodEnabled end,
+	getSelectedEvents = function() return selectedEvents end,
+	getEventTeleportEnabled = function() return eventTeleportEnabled end,
+	getPrioritizedEvent = function() return prioritizedEvent end,
+	getSavedPosition = function() return savedPosition end,
+	getSavePositionEnabled = function() return savePositionEnabled end,
+	getSelectedRod = function() return selectedRod end,
+	getSelectedBobber = function() return selectedBobber end,
+	getSelectedUtility = function() return selectedUtility end,
+	getSelectedWeather = function() return selectedWeather end,
+	getSellThreshold = function() return sellThreshold end,
+	getSelectedEnchant = function() return selectedEnchant end,
+	getAutoEnchantEnabled = function() return autoEnchantEnabled end,
+	getSelectedIsland = function() return selectedIsland end,
+	getSelectedRodShop = function() return selectedRodShop end,
+	getSelectedBaitShop = function() return selectedBaitShop end,
+	getSelectedSellShop = function() return selectedSellShop end,
+	getSelectedBoatSeller = function() return selectedBoatSeller end,
+	getSelectedNPC = function() return selectedNPC end,
+	getSelectedPlayer = function() return selectedPlayer end,
+	
+	-- Connection Getters/Setters for cleanup
+	getCutsceneConnection = function() return cutsceneConnection end,
+	setCutsceneConnection = function(val) cutsceneConnection = val end,
+	getHalloweenEventConnection = function() return halloweenEventConnection end,
+	setHalloweenEventConnection = function(val) halloweenEventConnection = val end,
+	getHalloweenNPCConnection = function() return halloweenNPCConnection end,
+	setHalloweenNPCConnection = function(val) halloweenNPCConnection = val end,
+	getHalloweenHouseConnection = function() return halloweenHouseConnection end,
+	setHalloweenHouseConnection = function(val) halloweenHouseConnection = val end,
+	getOriginalBlockOxygenLoss = function() return originalBlockOxygenLoss end,
+	setOriginalBlockOxygenLoss = function(val) originalBlockOxygenLoss = val end,
+	
+	-- Remotes
+	REEquipToolFromHotbar = REEquipToolFromHotbar,
+	UpdateFishingRadarRemote = UpdateFishingRadarRemote,
+	REReplicateCutscene = REReplicateCutscene,
+	REStopCutscene = REStopCutscene,
+	REClaimEventReward = REClaimEventReward,
+	RFSpecialDialogueEvent = RFSpecialDialogueEvent,
+
+	-- Potion helpers
+	getPlayerPotions = getPlayerPotions,
+	getPlayerPotionTotals = getPlayerPotionTotals,
+	
+	-- Halloween Data
+	halloweenNPCs = halloweenNPCs,
+	halloweenHouses = halloweenHouses,
+	setHalloweenHouses = function(val) halloweenHouses = val end,
+	getHalloweenHouses = function() return halloweenHouses end,
+	
+	-- Shop State Variables (for direct access)
+	selectedRod = selectedRod,
+	selectedBobber = selectedBobber,
+	selectedUtility = selectedUtility,
+	selectedWeather = selectedWeather,
+	PurchaseFishingRodRemote = PurchaseFishingRodRemote,
+	PurchaseBaitRemote = PurchaseBaitRemote,
+	PurchaseGearRemote = PurchaseGearRemote,
+	PurchaseWeatherRemote = PurchaseWeatherRemote,
+	
+	-- Teleport State Variables (for direct access)
+	selectedIsland = selectedIsland,
+	selectedRodShop = selectedRodShop,
+	selectedBaitShop = selectedBaitShop,
+	selectedSellShop = selectedSellShop,
+	selectedBoatSeller = selectedBoatSeller,
+	selectedNPC = selectedNPC,
+	selectedPlayer = selectedPlayer,
+}
+
+-- Container loader function with error handling
+local function loadContainer(name, url)
+	local success, result = pcall(function()
+		Notifier.new({
+			Title = "Loading " .. name,
+			Content = "Fetching container from GitHub...",
+			Duration = 2,
+			Icon = "rbxassetid://124426992222665"
+		})
+		
+		local code
+		if USE_LOCAL_CONTAINERS then
+			-- Load from local file (for testing)
+			local localPath = CONTAINER_LOCAL_PATHS[name]
+			print("[Fishit] Loading from:", localPath)
+			code = readfile(localPath)
+			print("[Fishit] Code length:", #code)
+			Notifier.new({
+				Title = "Loading " .. name,
+				Content = "Loading from local file...",
+				Duration = 1,
+				Icon = "rbxassetid://124426992222665"
+			})
+		else
+			-- Load from GitHub
+			print("[Fishit] Loading from GitHub:", url)
+			code = game:HttpGet(url)
+		end
+		
+		print("[Fishit] Compiling " .. name .. " container...")
+		local containerFunc, compileError = loadstring(code)
+		
+		if not containerFunc then
+			error("Failed to compile: " .. tostring(compileError))
+		end
+		
+		print("[Fishit] Executing " .. name .. " container...")
+		local setupFunc = containerFunc()
+		
+		if not setupFunc then
+			error("Container returned nil")
+		end
+		
+		if type(setupFunc) ~= "function" then
+			error("Container returned " .. type(setupFunc) .. " instead of function")
+		end
+		
+		print("[Fishit] Calling setup for " .. name .. " container...")
+		setupFunc(containerConfig)
+		
+		print("[Fishit] " .. name .. " container loaded successfully!")
+		Notifier.new({
+			Title = name .. " Container",
+			Content = "Successfully loaded!",
+			Duration = 2,
+			Icon = "rbxassetid://124426992222665"
+		})
+	end)
+	
+	if not success then
+		Notifier.new({
+			Title = "Error",
+			Content = "Failed to load " .. name .. " container: " .. tostring(result),
+			Duration = 5,
+			Icon = "rbxassetid://124426992222665"
+		})
+		warn("[Fishit] Failed to load " .. name .. " container:", result)
+		print("[Fishit] Full error:", debug.traceback(result))
+	end
+end
+
+-- Load all containers
+Notifier.new({
+	Title = "Loading Containers",
+	Content = "Loading modular UI containers from GitHub...",
+	Duration = 3,
+	Icon = "rbxassetid://124426992222665"
+})
+
+loadContainer("Fishing", CONTAINER_URLS.Fishing)
+loadContainer("Shop", CONTAINER_URLS.Shop)
+loadContainer("Useful", CONTAINER_URLS.Useful)
+loadContainer("Teleport", CONTAINER_URLS.Teleport)
+
+-- ============================================
+-- SETTINGS TAB & CONFIG
+-- ============================================
+
+-- Creating Config Tab
+local ConfigUI = Window:DrawConfig({
+	Name = "Config",
+	Icon = "folder",
+	Config = ConfigManager
+});
+
+ConfigUI:Init();
+
+-- Script Control Section
+local ScriptControlSection = Settings:DrawSection({
+	Name = "Script Control",
+});
+
+ScriptControlSection:AddButton({
+	Name = "Minimize Script",
+	Callback = function()
+		Window:Toggle(false);
+		Notifier.new({
+			Title = "Minimized",
+			Content = "Minimize keybind is Left Alt",
+			Duration = 5,
+			Icon = "rbxassetid://124426992222665"
+		});
+	end,
+});
+
+ScriptControlSection:AddButton({
+	Name = "Unload Script",
+	Callback = function()
+		-- Stop all active features before unloading
+		
+		-- Unfreeze player if frozen for event
+		if playerFrozenForEvent then
+			unfreezePlayerForEvent()
+		end
+		
+		if autoEquipRodEnabled then
+			autoEquipRodEnabled = false
+			stopAutoEquipRod()
+		end
+		
+		if eventTeleportEnabled then
+			eventTeleportEnabled = false
+			stopEventTeleport()
+		end
+		
+		if legitAutoFishEnabled then
+			StopLegitAutoFish()
+		end
+		
+		if autoFavoriteEnabled then
+			autoFavoriteEnabled = false
+			stopAutoFavorite()
+		end
+		
+		if autoUnfavoriteEnabled then
+			autoUnfavoriteEnabled = false
+			stopAutoUnfavorite()
+		end
+		
+		if autoSellEnabled then
+			autoSellEnabled = false
+			stopAutoSell()
+		end
+		
+		if autoEnchantEnabled then
+			autoEnchantEnabled = false
+			stopAutoEnchant()
+		end
+		
+		-- Destroy mobile toggle button
+		pcall(function()
+			local coreGui = game:GetService("CoreGui")
+			local playerGui = game:GetService("Players").LocalPlayer.PlayerGui
+			
+			-- Check CoreGui
+			for _, child in pairs(coreGui:GetChildren()) do
+				if child.Name == "FishitMobileToggle" then
+					child:Destroy()
+				end
+			end
+			
+			-- Check PlayerGui
+			for _, child in pairs(playerGui:GetChildren()) do
+				if child.Name == "FishitMobileToggle" then
+					child:Destroy()
+				end
+			end
+		end)
+		
+		-- Stop all connections
+		if infiniteOxygenEnabled then
+			infiniteOxygenEnabled = false
+		end
+		
+		if radarBypassEnabled then
+			radarBypassEnabled = false
+		end
+		
+		if cutsceneConnection then
+			cutsceneConnection:Disconnect()
+			cutsceneConnection = nil
+		end
+		
+		running = false
+		Window:Destroy()
+		
+		Notifier.new({
+			Title = "Script Unloaded",
+			Content = "All features stopped and UI destroyed",
+			Duration = 3,
+			Icon = "rbxassetid://124426992222665"
+		});
+	end,
+});
+
+-- Settings Section
+local SettingsSection = Settings:DrawSection({
+	Name = "UI Settings",
+});
+
+SettingsSection:AddToggle({
+	Name = "Always Show Frame",
+	Default = true,
+	Callback = function(v)
+		Window.AlwayShowTab = v;
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Highlight",
+	Default = Compkiller.Colors.Highlight,
+	Callback = function(v)
+		Compkiller.Colors.Highlight = v;
+		Compkiller:RefreshCurrentColor();
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Toggle Color",
+	Default = Compkiller.Colors.Toggle,
+	Callback = function(v)
+		Compkiller.Colors.Toggle = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Drop Color",
+	Default = Compkiller.Colors.DropColor,
+	Callback = function(v)
+		Compkiller.Colors.DropColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Risky",
+	Default = Compkiller.Colors.Risky,
+	Callback = function(v)
+		Compkiller.Colors.Risky = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Mouse Enter",
+	Default = Compkiller.Colors.MouseEnter,
+	Callback = function(v)
+		Compkiller.Colors.MouseEnter = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Block Color",
+	Default = Compkiller.Colors.BlockColor,
+	Callback = function(v)
+		Compkiller.Colors.BlockColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Background Color",
+	Default = Compkiller.Colors.BGDBColor,
+	Callback = function(v)
+		Compkiller.Colors.BGDBColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Block Background Color",
+	Default = Compkiller.Colors.BlockBackground,
+	Callback = function(v)
+		Compkiller.Colors.BlockBackground = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Stroke Color",
+	Default = Compkiller.Colors.StrokeColor,
+	Callback = function(v)
+		Compkiller.Colors.StrokeColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "High Stroke Color",
+	Default = Compkiller.Colors.HighStrokeColor,
+	Callback = function(v)
+		Compkiller.Colors.HighStrokeColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Switch Color",
+	Default = Compkiller.Colors.SwitchColor,
+	Callback = function(v)
+		Compkiller.Colors.SwitchColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddColorPicker({
+	Name = "Line Color",
+	Default = Compkiller.Colors.LineColor,
+	Callback = function(v)
+		Compkiller.Colors.LineColor = v;
+		Compkiller:RefreshCurrentColor(v);
+	end,
+});
+
+SettingsSection:AddButton({
+	Name = "Get Theme",
+	Callback = function()
+		print(Compkiller:GetTheme())
+		Notifier.new({
+			Title = "Notification",
+			Content = "Copied Theme Color to your clipboard",
+			Duration = 5,
+			Icon = "rbxassetid://124426992222665"
+		});
+	end,
+});
+
+-- Theme Section
+local ThemeSection = Settings:DrawSection({
+	Name = "UI Themes"
+});
+
+ThemeSection:AddDropdown({
+	Name = "Select Theme",
+	Default = "Default",
+	Values = {
+		"Default",
+		"Dark Green",
+		"Dark Blue",
+		"Purple Rose",
+		"Skeet"
+	},
+	Callback = function(v)
+		Compkiller:SetTheme(v)
+	end,
+});
+
+-- Mobile Toggle Button
+local mobileButton = nil
+local mobileScreenGui = nil
+
+local function cleanupMobileButton()
+	pcall(function()
+		local coreGui = game:GetService("CoreGui")
+		local playerGui = game:GetService("Players").LocalPlayer.PlayerGui
+		
+		for _, child in pairs(coreGui:GetChildren()) do
+			if child.Name == "FishitMobileToggle" then
+				child:Destroy()
+			end
+		end
+		
+		for _, child in pairs(playerGui:GetChildren()) do
+			if child.Name == "FishitMobileToggle" then
+				child:Destroy()
+			end
+		end
+		
+		print("[Fishit] Mobile button cleanup completed")
+	end)
+end
+
+local function createMobileToggle()
+	cleanupMobileButton()
+	
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "FishitMobileToggle"
+	screenGui.ResetOnSpawn = false
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	
+	pcall(function()
+		screenGui.Parent = game:GetService("CoreGui")
+	end)
+	
+	if not screenGui.Parent then
+		screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	end
+	
+	mobileScreenGui = screenGui
+	
+	mobileButton = Instance.new("ImageButton")
+	mobileButton.Name = "ToggleButton"
+	mobileButton.Size = UDim2.new(0, 60, 0, 60)
+	mobileButton.Position = UDim2.new(0, 20, 0, 100)
+	mobileButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	mobileButton.BackgroundTransparency = 0.3
+	mobileButton.BorderSizePixel = 0
+	mobileButton.Image = "rbxassetid://124426992222665"
+	mobileButton.ImageTransparency = 0
+	mobileButton.ZIndex = 1000
+	mobileButton.Parent = screenGui
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = mobileButton
+	
+	-- Make draggable
+	local dragging = false
+	local dragInput
+	local dragStart
+	local startPos
+	
+	mobileButton.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = mobileButton.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
 				end
 			end)
-		end,
-	});
-
-	EnchantSection:AddParagraph({
-		Title = "Instructions",
-		Text = "1. Equip an enchant stone\n2. Click 'Teleport to Enchant Altar'\n3. Click 'Enchant' to use the stone\n4. Wait for enchant animation to complete"
-	});
+		end
+	end)
+	
+	mobileButton.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	
+	game:GetService("UserInputService").InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			local viewport = workspace.CurrentCamera.ViewportSize
+			local newX = math.clamp(startPos.X.Offset + delta.X, 0, viewport.X - 60)
+			local newY = math.clamp(startPos.Y.Offset + delta.Y, 0, viewport.Y - 60)
+			mobileButton.Position = UDim2.new(0, newX, 0, newY)
+		end
+	end)
+	
+	local clickStartTime = 0
+	local clickStartPos = nil
+	
+	mobileButton.MouseButton1Down:Connect(function()
+		clickStartTime = tick()
+		clickStartPos = mobileButton.Position
+	end)
+	
+	mobileButton.MouseButton1Up:Connect(function()
+		local clickEndTime = tick()
+		local clickEndPos = mobileButton.Position
+		
+		if (clickEndTime - clickStartTime) < 0.3 and clickStartPos and 
+		   math.abs(clickStartPos.X.Offset - clickEndPos.X.Offset) < 5 and
+		   math.abs(clickStartPos.Y.Offset - clickEndPos.Y.Offset) < 5 then
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftAlt, false, game)
+			task.wait(0.1)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftAlt, false, game)
+		end
+	end)
+	
+	print("[Fishit] Mobile toggle button created successfully!")
 end
+
+local function destroyMobileToggle()
+	cleanupMobileButton()
+end
+
+-- Auto-cleanup
+game:GetService("Players").LocalPlayer.AncestryChanged:Connect(function()
+	cleanupMobileButton()
+end)
+
+getgenv().FishitCleanup = cleanupMobileButton
+
+-- Create button immediately
+createMobileToggle()
+
+-- Mobile Section
+local MobileSection = Settings:DrawSection({
+	Name = "Mobile Support"
+});
+
+MobileSection:AddToggle({
+	Name = "Mobile Toggle Button",
+	Default = true,
+	Callback = function(Value)
+		if Value then
+			createMobileToggle()
+			Notifier.new({
+				Title = "Mobile Button",
+				Content = "Toggle button enabled",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		else
+			destroyMobileToggle()
+			Notifier.new({
+				Title = "Mobile Button",
+				Content = "Toggle button disabled",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		end
+	end,
+});
+
+print("[Fishit] New modular script loaded successfully!")
