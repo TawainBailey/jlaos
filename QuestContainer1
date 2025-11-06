@@ -48,6 +48,12 @@ return function(config)
 		}
 	}
 
+	-- Progress GUI Variables
+	local sisyphusProgressEnabled = false
+	local artifactProgressEnabled = false
+	local sisyphusScreenGui = nil
+	local artifactScreenGui = nil
+
 	-- Quest Functions
 	local function teleportToLocation(cframe)
 		local character = player.Character
@@ -407,6 +413,409 @@ return function(config)
 		end
 	end
 
+	-- Progress GUI Functions
+	local function createSisyphusProgressGUI()
+		if sisyphusScreenGui then return end
+
+		-- Services
+		local Players = game:GetService("Players")
+		local RunService = game:GetService("RunService")
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+		local player = Players.LocalPlayer
+		local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
+		local QuestUtility = require(ReplicatedStorage.Shared.Quests.QuestUtility)
+
+		-- Create ScreenGui
+		sisyphusScreenGui = Instance.new("ScreenGui")
+		sisyphusScreenGui.Name = "SisyphusProgressGUI"
+		sisyphusScreenGui.ResetOnSpawn = false
+		sisyphusScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+		-- Create main frame
+		local mainFrame = Instance.new("Frame")
+		mainFrame.Name = "MainFrame"
+		mainFrame.Size = UDim2.new(0, 400, 0, 300)
+		mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+		mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+		mainFrame.BorderSizePixel = 0
+		mainFrame.Parent = sisyphusScreenGui
+
+		-- Add rounded corners
+		local uiCorner = Instance.new("UICorner")
+		uiCorner.CornerRadius = UDim.new(0, 8)
+		uiCorner.Parent = mainFrame
+
+		-- Add drop shadow
+		local dropShadow = Instance.new("Frame")
+		dropShadow.Name = "DropShadow"
+		dropShadow.Size = UDim2.new(1, 10, 1, 10)
+		dropShadow.Position = UDim2.new(0, -5, 0, -5)
+		dropShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		dropShadow.BackgroundTransparency = 0.7
+		dropShadow.BorderSizePixel = 0
+		dropShadow.ZIndex = -1
+		dropShadow.Parent = mainFrame
+
+		local shadowCorner = Instance.new("UICorner")
+		shadowCorner.CornerRadius = UDim.new(0, 8)
+		shadowCorner.Parent = dropShadow
+
+		-- Title bar
+		local titleBar = Instance.new("Frame")
+		titleBar.Name = "TitleBar"
+		titleBar.Size = UDim2.new(1, 0, 0, 40)
+		titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+		titleBar.BorderSizePixel = 0
+		titleBar.Parent = mainFrame
+
+		local titleCorner = Instance.new("UICorner")
+		titleCorner.CornerRadius = UDim.new(0, 8)
+		titleCorner.Parent = titleBar
+
+		-- Title text
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.Name = "TitleLabel"
+		titleLabel.Size = UDim2.new(1, 0, 1, 0)
+		titleLabel.Position = UDim2.new(0, 15, 0, 0)
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.Text = "Sisyphus Quest Progress"
+		titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		titleLabel.TextSize = 18
+		titleLabel.Font = Enum.Font.SourceSansBold
+		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		titleLabel.Parent = titleBar
+
+		-- Content frame
+		local contentFrame = Instance.new("Frame")
+		contentFrame.Name = "ContentFrame"
+		contentFrame.Size = UDim2.new(1, -20, 1, -60)
+		contentFrame.Position = UDim2.new(0, 10, 0, 50)
+		contentFrame.BackgroundTransparency = 1
+		contentFrame.Parent = mainFrame
+
+		-- Progress labels
+		local progressLabels = {}
+
+		local function createProgressLabel(name, position)
+			local label = Instance.new("TextLabel")
+			label.Name = name .. "Label"
+			label.Size = UDim2.new(1, 0, 0, 25)
+			label.Position = position
+			label.BackgroundTransparency = 1
+			label.Text = name .. ": Loading..."
+			label.TextColor3 = Color3.fromRGB(200, 200, 200)
+			label.TextSize = 14
+			label.Font = Enum.Font.SourceSans
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.Parent = contentFrame
+			return label
+		end
+
+		progressLabels.treasureRoom = createProgressLabel("Treasure Room Fish", UDim2.new(0, 0, 0, 0))
+		progressLabels.mythicSisyphus = createProgressLabel("Mythic Fish at Statue", UDim2.new(0, 0, 0, 30))
+		progressLabels.secretSisyphus = createProgressLabel("Secret Fish at Statue", UDim2.new(0, 0, 0, 60))
+		progressLabels.earnCoins = createProgressLabel("Earn 1M Coins", UDim2.new(0, 0, 0, 90))
+		progressLabels.overall = createProgressLabel("Overall Progress", UDim2.new(0, 0, 0, 130))
+
+		-- Make overall progress label bold and larger
+		progressLabels.overall.TextSize = 16
+		progressLabels.overall.Font = Enum.Font.SourceSansBold
+		progressLabels.overall.TextColor3 = Color3.fromRGB(100, 200, 255)
+
+		-- Update progress function
+		local function updateProgress()
+			local progress = getDeepSeaQuestProgress()
+
+			if not progress then
+				for name, label in pairs(progressLabels) do
+					if name == "overall" then
+						label.Text = "Overall Progress: No quest data"
+					else
+						label.Text = progress[name].name .. ": No quest data"
+					end
+				end
+				return
+			end
+
+			-- Calculate percentages
+			local treasurePercent = math.min((progress.treasureRoom.current / progress.treasureRoom.needed) * 100, 100)
+			local mythicPercent = math.min((progress.mythicSisyphus.current / progress.mythicSisyphus.needed) * 100, 100)
+			local secretPercent = math.min((progress.secretSisyphus.current / progress.secretSisyphus.needed) * 100, 100)
+			local coinsPercent = math.min((progress.earnCoins.current / progress.earnCoins.needed) * 100, 100)
+
+			-- Update labels
+			progressLabels.treasureRoom.Text = string.format("Treasure Room Fish: %.1f%% (%d/%d)", treasurePercent, progress.treasureRoom.current, progress.treasureRoom.needed)
+			progressLabels.mythicSisyphus.Text = string.format("Mythic Fish at Statue: %.1f%% (%d/%d)", mythicPercent, progress.mythicSisyphus.current, progress.mythicSisyphus.needed)
+			progressLabels.secretSisyphus.Text = string.format("Secret Fish at Statue: %.1f%% (%d/%d)", secretPercent, progress.secretSisyphus.current, progress.secretSisyphus.needed)
+			progressLabels.earnCoins.Text = string.format("Earn 1M Coins: %.1f%% (%d/%d)", coinsPercent, progress.earnCoins.current, progress.earnCoins.needed)
+
+			-- Calculate overall progress
+			local completedQuests = 0
+			if progress.treasureRoom.completed then completedQuests = completedQuests + 1 end
+			if progress.mythicSisyphus.completed then completedQuests = completedQuests + 1 end
+			if progress.secretSisyphus.completed then completedQuests = completedQuests + 1 end
+			if progress.earnCoins.completed then completedQuests = completedQuests + 1 end
+
+			local overallPercent = (completedQuests / 4) * 100
+			progressLabels.overall.Text = string.format("Overall Progress: %.1f%% (%d/4 completed)", overallPercent, completedQuests)
+		end
+
+		-- Make frame draggable
+		local dragging = false
+		local dragStart = nil
+		local startPos = nil
+
+		titleBar.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = true
+				dragStart = input.Position
+				startPos = mainFrame.Position
+
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+					end
+				end)
+			end
+		end)
+
+		titleBar.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+				local delta = input.Position - dragStart
+				mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			end
+		end)
+
+		-- Auto-update progress every 5 seconds
+		local lastUpdateTime = 0
+		local updateConnection = RunService.Heartbeat:Connect(function()
+			if sisyphusProgressEnabled then
+				local currentTime = tick()
+				if currentTime - lastUpdateTime >= 5 then
+					updateProgress()
+					lastUpdateTime = currentTime
+				end
+			end
+		end)
+
+		-- Initial update
+		task.wait(1)
+		updateProgress()
+
+		-- Parent to PlayerGui
+		sisyphusScreenGui.Parent = player:WaitForChild("PlayerGui")
+	end
+
+	local function destroySisyphusProgressGUI()
+		if sisyphusScreenGui then
+			sisyphusScreenGui:Destroy()
+			sisyphusScreenGui = nil
+		end
+	end
+
+	local function createArtifactProgressGUI()
+		if artifactScreenGui then return end
+
+		-- Services
+		local Players = game:GetService("Players")
+		local RunService = game:GetService("RunService")
+
+		local player = Players.LocalPlayer
+		local replion = require(game.ReplicatedStorage.Packages.Replion).Client:WaitReplion("Data")
+
+		-- Create ScreenGui
+		artifactScreenGui = Instance.new("ScreenGui")
+		artifactScreenGui.Name = "ArtifactProgressGUI"
+		artifactScreenGui.ResetOnSpawn = false
+		artifactScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+		-- Create main frame
+		local mainFrame = Instance.new("Frame")
+		mainFrame.Name = "MainFrame"
+		mainFrame.Size = UDim2.new(0, 400, 0, 250)
+		mainFrame.Position = UDim2.new(0.5, -200, 0.5, -125)
+		mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+		mainFrame.BorderSizePixel = 0
+		mainFrame.Parent = artifactScreenGui
+
+		-- Add rounded corners
+		local uiCorner = Instance.new("UICorner")
+		uiCorner.CornerRadius = UDim.new(0, 8)
+		uiCorner.Parent = mainFrame
+
+		-- Add drop shadow
+		local dropShadow = Instance.new("Frame")
+		dropShadow.Name = "DropShadow"
+		dropShadow.Size = UDim2.new(1, 10, 1, 10)
+		dropShadow.Position = UDim2.new(0, -5, 0, -5)
+		dropShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		dropShadow.BackgroundTransparency = 0.7
+		dropShadow.BorderSizePixel = 0
+		dropShadow.ZIndex = -1
+		dropShadow.Parent = mainFrame
+
+		local shadowCorner = Instance.new("UICorner")
+		shadowCorner.CornerRadius = UDim.new(0, 8)
+		shadowCorner.Parent = dropShadow
+
+		-- Title bar
+		local titleBar = Instance.new("Frame")
+		titleBar.Name = "TitleBar"
+		titleBar.Size = UDim2.new(1, 0, 0, 40)
+		titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+		titleBar.BorderSizePixel = 0
+		titleBar.Parent = mainFrame
+
+		local titleCorner = Instance.new("UICorner")
+		titleCorner.CornerRadius = UDim.new(0, 8)
+		titleCorner.Parent = titleBar
+
+		-- Title text
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.Name = "TitleLabel"
+		titleLabel.Size = UDim2.new(1, 0, 1, 0)
+		titleLabel.Position = UDim2.new(0, 15, 0, 0)
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.Text = "Artifact Quest Progress"
+		titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		titleLabel.TextSize = 18
+		titleLabel.Font = Enum.Font.SourceSansBold
+		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		titleLabel.Parent = titleBar
+
+		-- Content frame
+		local contentFrame = Instance.new("Frame")
+		contentFrame.Name = "ContentFrame"
+		contentFrame.Size = UDim2.new(1, -20, 1, -60)
+		contentFrame.Position = UDim2.new(0, 10, 0, 50)
+		contentFrame.BackgroundTransparency = 1
+		contentFrame.Parent = mainFrame
+
+		-- Artifact status labels
+		local artifactLabels = {}
+
+		local function createArtifactLabel(artifactName, position)
+			local label = Instance.new("TextLabel")
+			label.Name = artifactName .. "Label"
+			label.Size = UDim2.new(1, 0, 0, 30)
+			label.Position = position
+			label.BackgroundTransparency = 1
+			label.Text = artifactName .. ": Checking..."
+			label.TextColor3 = Color3.fromRGB(200, 200, 200)
+			label.TextSize = 14
+			label.Font = Enum.Font.SourceSans
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.Parent = contentFrame
+			return label
+		end
+
+		-- Create labels for each artifact
+		artifactLabels["Arrow Artifact"] = createArtifactLabel("Arrow Artifact", UDim2.new(0, 0, 0, 0))
+		artifactLabels["Hourglass Diamond Artifact"] = createArtifactLabel("Hourglass Diamond Artifact", UDim2.new(0, 0, 0, 35))
+		artifactLabels["Crescent Artifact"] = createArtifactLabel("Crescent Artifact", UDim2.new(0, 0, 0, 70))
+		artifactLabels["Diamond Artifact"] = createArtifactLabel("Diamond Artifact", UDim2.new(0, 0, 0, 105))
+
+		-- Overall progress label
+		local overallLabel = Instance.new("TextLabel")
+		overallLabel.Name = "OverallLabel"
+		overallLabel.Size = UDim2.new(1, 0, 0, 25)
+		overallLabel.Position = UDim2.new(0, 0, 0, 145)
+		overallLabel.BackgroundTransparency = 1
+		overallLabel.Text = "Overall Progress: Checking..."
+		overallLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+		overallLabel.TextSize = 16
+		overallLabel.Font = Enum.Font.SourceSansBold
+		overallLabel.TextXAlignment = Enum.TextXAlignment.Left
+		overallLabel.Parent = contentFrame
+
+		-- Check artifact status function
+		local function checkArtifactStatus()
+			local success, templeLevers = pcall(function()
+				return replion:Get({"TempleLevers"})
+			end)
+
+			if not success then
+				for _, label in pairs(artifactLabels) do
+					label.Text = label.Name:gsub("Label", "") .. ": Error checking status"
+					label.TextColor3 = Color3.fromRGB(255, 100, 100)
+				end
+				overallLabel.Text = "Overall Progress: Error checking status"
+				return
+			end
+
+			local activatedCount = 0
+
+			for artifactName, label in pairs(artifactLabels) do
+				local isActivated = templeLevers and templeLevers[artifactName] or false
+
+				if isActivated then
+					label.Text = artifactName .. ": ✓ ACTIVATED"
+					label.TextColor3 = Color3.fromRGB(100, 255, 100)
+					activatedCount = activatedCount + 1
+				else
+					label.Text = artifactName .. ": ✗ NOT ACTIVATED"
+					label.TextColor3 = Color3.fromRGB(255, 200, 100)
+				end
+			end
+
+			local overallPercent = (activatedCount / 4) * 100
+			overallLabel.Text = string.format("Overall Progress: %.1f%% (%d/4 activated)", overallPercent, activatedCount)
+		end
+
+		-- Make frame draggable
+		local dragging = false
+		local dragStart = nil
+		local startPos = nil
+
+		titleBar.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = true
+				dragStart = input.Position
+				startPos = mainFrame.Position
+
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+					end
+				end)
+			end
+		end)
+
+		titleBar.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+				local delta = input.Position - dragStart
+				mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			end
+		end)
+
+		-- Auto-update status every 3 seconds
+		local lastUpdateTime = 0
+		local updateConnection = RunService.Heartbeat:Connect(function()
+			if artifactProgressEnabled then
+				local currentTime = tick()
+				if currentTime - lastUpdateTime >= 3 then
+					checkArtifactStatus()
+					lastUpdateTime = currentTime
+				end
+			end
+		end)
+
+		-- Initial check
+		task.wait(1)
+		checkArtifactStatus()
+
+		-- Parent to PlayerGui
+		artifactScreenGui.Parent = player:WaitForChild("PlayerGui")
+	end
+
+	local function destroyArtifactProgressGUI()
+		if artifactScreenGui then
+			artifactScreenGui:Destroy()
+			artifactScreenGui = nil
+		end
+	end
+
 	-- Quests Section
 	local QuestsSection = config.QuestTab:DrawSection({
 		Name = "Quests",
@@ -482,6 +891,61 @@ return function(config)
 				Notifier.new({
 					Title = "Auto Quest Stopped",
 					Content = "Quest automation stopped",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Progress GUI Section
+	local ProgressSection = config.QuestTab:DrawSection({
+		Name = "Progress GUI",
+	});
+
+	ProgressSection:AddToggle({
+		Name = "Sisyphus Progress",
+		Default = false,
+		Callback = function(Value)
+			sisyphusProgressEnabled = Value
+			if Value then
+				createSisyphusProgressGUI()
+				Notifier.new({
+					Title = "Sisyphus Progress GUI",
+					Content = "Progress GUI opened",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				destroySisyphusProgressGUI()
+				Notifier.new({
+					Title = "Sisyphus Progress GUI",
+					Content = "Progress GUI closed",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	ProgressSection:AddToggle({
+		Name = "Artifact Progress",
+		Default = false,
+		Callback = function(Value)
+			artifactProgressEnabled = Value
+			if Value then
+				createArtifactProgressGUI()
+				Notifier.new({
+					Title = "Artifact Progress GUI",
+					Content = "Progress GUI opened",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				destroyArtifactProgressGUI()
+				Notifier.new({
+					Title = "Artifact Progress GUI",
+					Content = "Progress GUI closed",
 					Duration = 2,
 					Icon = "rbxassetid://124426992222665"
 				})
