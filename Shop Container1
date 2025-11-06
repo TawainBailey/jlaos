@@ -1,4 +1,4 @@
--- Shop Containev6r (Automatically Tab)
+-- Shop Conv7tainer (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -16,10 +16,6 @@ return function(config)
 	local setSelectedUtility = config.setSelectedUtility
 	local setSavedPosition = config.setSavedPosition
 	local setSavePositionEnabled = config.setSavePositionEnabled
-	local setSelectedEnchant = config.setSelectedEnchant
-	local setAutoEnchantEnabled = config.setAutoEnchantEnabled
-	local setSelectedPotions = config.setSelectedPotions
-	local setAutoPotionEnabled = config.setAutoPotionEnabled
 	
 	-- State getters
 	local getSavedPosition = config.getSavedPosition
@@ -28,15 +24,6 @@ return function(config)
 	local getSelectedBobber = config.getSelectedBobber
 	local getSelectedUtility = config.getSelectedUtility
 	local getSelectedWeather = config.getSelectedWeather
-	local getSelectedEnchant = config.getSelectedEnchant
-	local getAutoEnchantEnabled = config.getAutoEnchantEnabled
-	local getSelectedPotions = config.getSelectedPotions
-	local getAutoPotionEnabled = config.getAutoPotionEnabled
-	
-	-- Functions
-	local startAutoPotion = config.startAutoPotion
-	local stopAutoPotion = config.stopAutoPotion
-	local getAllPotionNames = config.getAllPotionNames
 	
 	-- Variables for Merchant
 	local merchantGuiOpen = false
@@ -323,6 +310,210 @@ return function(config)
 		Name = "Utilities/Gear"
 	});
 
+	-- Potions Section
+	local PotionsSection = ShopTab:DrawSection({
+		Name = "Potions"
+	});
+
+	-- State for potions selection
+	local selectedPotions = config.getSelectedPotionsShop and config.getSelectedPotionsShop() or {}
+	local function saveSelectedPotions()
+		if config.setSelectedPotionsShop then
+			config.setSelectedPotionsShop(selectedPotions)
+		end
+	end
+
+	-- Build list of all potions from ItemUtility
+	local allPotionNames = {}
+	pcall(function()
+		local potions = ItemUtility:GetPotions()
+		for _, potion in ipairs(potions) do
+			if potion and potion.Data and potion.Data.Name then
+				table.insert(allPotionNames, potion.Data.Name)
+			end
+		end
+		table.sort(allPotionNames)
+	end)
+
+	local currentPotionChoice = allPotionNames[1]
+	PotionsSection:AddDropdown({
+		Name = "Select Potion",
+		Default = currentPotionChoice or "",
+		Values = allPotionNames,
+		Callback = function(v)
+			currentPotionChoice = v
+		end,
+	});
+
+	local selectedPotionsLabel = PotionsSection:AddParagraph({
+		Title = "Selected Potions",
+		Content = "None"
+	});
+
+	local function refreshSelectedLabel()
+		if #selectedPotions == 0 then
+			selectedPotionsLabel:SetText("None")
+		else
+			selectedPotionsLabel:SetText(table.concat(selectedPotions, ", "))
+		end
+	end
+	refreshSelectedLabel()
+
+	PotionsSection:AddButton({
+		Name = "Add to Selection",
+		Callback = function()
+			if not currentPotionChoice or currentPotionChoice == "" then return end
+			if not table.find(selectedPotions, currentPotionChoice) then
+				table.insert(selectedPotions, currentPotionChoice)
+				saveSelectedPotions()
+				refreshSelectedLabel()
+				Notifier.new({
+					Title = "Potions",
+					Content = "Added: " .. currentPotionChoice,
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	PotionsSection:AddButton({
+		Name = "Clear Selection",
+		Callback = function()
+			selectedPotions = {}
+			saveSelectedPotions()
+			refreshSelectedLabel()
+			Notifier.new({
+				Title = "Potions",
+				Content = "Cleared selection",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		end,
+	});
+
+	-- Auto Use toggle and loop
+	local autoUseToggle = config.getAutoUsePotionsEnabled and config.getAutoUsePotionsEnabled() or false
+	local autoPotionThread = nil
+
+	local function isPotionEquipped(replion, potionId)
+		local ok, equipped = pcall(function()
+			return replion:GetExpect("EquippedPotions")
+		end)
+		if not ok or not equipped then return false end
+		for _, p in ipairs(equipped) do
+			if p.Id == potionId then return true end
+		end
+		return false
+	end
+
+	local function getPotionIdByName(name)
+		local id
+		pcall(function()
+			for _, potion in ipairs(ItemUtility:GetPotions()) do
+				if potion.Data and potion.Data.Name == name then
+					id = potion.Data.Id
+					break
+				end
+			end
+		end)
+		return id
+	end
+
+	local function findOwnedPotion(replion, potionId)
+		local ok, inventory = pcall(function()
+			return replion:GetExpect("Inventory")
+		end)
+		if not ok or not inventory then return nil end
+		local potionsBag = inventory.Potions or inventory["Potions"]
+		if not potionsBag then return nil end
+		for _, entry in pairs(potionsBag) do
+			if entry and entry.Id == potionId then
+				return entry
+			end
+		end
+		return nil
+	end
+
+	local Net
+	pcall(function()
+		Net = require(ReplicatedStorage.Packages.Net)
+	end)
+	local RFConsumePotion = Net and Net:RemoteFunction("ConsumePotion")
+	if not RFConsumePotion then
+		pcall(function()
+			RFConsumePotion = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/ConsumePotion"]
+		end)
+	end
+
+	local replion = config.replion
+
+	local function startAutoPotions()
+		if autoPotionThread ~= nil then return end
+			autoPotionThread = task.spawn(function()
+				while autoUseToggle do
+					if replion and RFConsumePotion then
+						for _, name in ipairs(selectedPotions) do
+							local pid = getPotionIdByName(name)
+							if pid then
+								local owned = findOwnedPotion(replion, pid)
+								if owned and (owned.Quantity or 1) > 0 then
+									if not isPotionEquipped(replion, pid) then
+										local ok2, err2 = pcall(function()
+											RFConsumePotion:InvokeServer(pid, 1)
+										end)
+										if ok2 then
+											Notifier.new({
+												Title = "Potions",
+												Content = "Used: " .. name,
+												Duration = 2,
+												Icon = "rbxassetid://124426992222665"
+											})
+											-- brief delay between uses
+											task.wait(0.25)
+										else
+											Notifier.new({
+												Title = "Potions Error",
+												Content = tostring(err2 or "Failed to use potion") .. " (" .. tostring(name) .. ")",
+												Duration = 3,
+												Icon = "rbxassetid://124426992222665"
+											})
+										end
+									end
+								end
+							end
+						end
+					end
+					-- Wait a bit before next sweep
+					task.wait(3)
+				end
+				autoPotionThread = nil
+			end)
+	end
+
+	local function stopAutoPotions()
+		autoUseToggle = false
+		if config.setAutoUsePotionsEnabled then config.setAutoUsePotionsEnabled(false) end
+		if autoPotionThread then
+			task.cancel(autoPotionThread)
+			autoPotionThread = nil
+		end
+	end
+
+	PotionsSection:AddToggle({
+		Name = "Auto Use Selected",
+		Default = autoUseToggle,
+		Callback = function(val)
+			autoUseToggle = val and true or false
+			if config.setAutoUsePotionsEnabled then config.setAutoUsePotionsEnabled(autoUseToggle) end
+			if autoUseToggle then
+				startAutoPotions()
+			else
+				stopAutoPotions()
+			end
+		end,
+	});
+
 	UtilitiesSection:AddDropdown({
 		Name = "Select Utility",
 		Default = "Diving Gear",
@@ -487,51 +678,5 @@ return function(config)
 	EnchantSection:AddParagraph({
 		Title = "Instructions",
 		Text = "1. Equip an enchant stone\n2. Click 'Teleport to Enchant Altar'\n3. Click 'Enchant' to use the stone\n4. Wait for enchant animation to complete"
-	});
-	
-	-- Potion Section
-	local PotionSection = ShopTab:DrawSection({
-		Name = "Potion",
-	});
-	
-	-- Get all available potions dynamically
-	local availablePotions = getAllPotionNames()
-	
-	PotionSection:AddDropdown({
-		Name = "Select Potion",
-		Default = "",
-		Options = availablePotions,
-		MultiSelect = false,
-		Callback = function(Value)
-			setSelectedPotions(Value)
-		end,
-	});
-	
-	PotionSection:AddToggle({
-		Name = "Auto Use Potions",
-		Default = false,
-		Callback = function(Value)
-			setAutoPotionEnabled(Value)
-			
-			if Value then
-				startAutoPotion()
-				
-				Notifier.new({
-					Title = "Auto Potion Enabled",
-					Content = "Will automatically use selected potion",
-					Duration = 3,
-					Icon = "rbxassetid://124426992222665"
-				})
-			else
-				stopAutoPotion()
-				
-				Notifier.new({
-					Title = "Auto Potion Disabled",
-					Content = "Stopped auto using potion",
-					Duration = 2,
-					Icon = "rbxassetid://124426992222665"
-				})
-			end
-		end,
 	});
 end
