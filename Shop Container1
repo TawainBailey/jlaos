@@ -1,4 +1,4 @@
--- Shop Containerv14 (Automatically Tab)
+-- Shop Containerv15 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -707,7 +707,7 @@ return function(config)
 				end
 				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 					player.Character.HumanoidRootPart.CFrame = CFrame.new(handle.Position + Vector3.new(0, 3, 0))
-					Notifier.new({Title = "Totems", Content = "Teleported to " .. tostring(selectedTotem), Duration = 2, Icon = "rbxassetid://124426992222665"})
+					-- Teleport performed (no notification as requested)
 				end
 			end)
 		end,
@@ -743,7 +743,7 @@ return function(config)
 				end
 				if nearestHandle then
 					player.Character.HumanoidRootPart.CFrame = CFrame.new(nearestHandle.Position + Vector3.new(0, 3, 0))
-					Notifier.new({Title = "Totems", Content = "Teleported to nearest totem: " .. tostring(nearest and nearest.Name or "unknown"), Duration = 2, Icon = "rbxassetid://124426992222665"})
+					-- Teleport performed (no notification as requested)
 				else
 					Notifier.new({Title = "Totems", Content = "No active totems found", Duration = 3, Icon = "rbxassetid://124426992222665"})
 				end
