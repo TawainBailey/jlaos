@@ -1,4 +1,4 @@
--- Shop Containerv111 (Automatically Tab)
+-- Shop Containerv14 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -622,6 +622,134 @@ return function(config)
 			end
 		end,
 	});
+
+	-- Totems Section
+	local TotemsSection = ShopTab:DrawSection({
+		Name = "Totems"
+	});
+
+	-- Helper to scan workspace for Totems and extract names and handle parts
+	local function scanTotems()
+		local results = {}
+		local map = {}
+		local workspace = game:GetService("Workspace")
+		local root = workspace:FindFirstChild("Totems")
+		if not root then return results, map end
+
+		for _, model in ipairs(root:GetChildren()) do
+			if model and model:IsA("Model") then
+				local handle = model:FindFirstChild("Handle", true)
+				if handle and handle:IsA("BasePart") then
+					local nameText = nil
+					local overhead = handle:FindFirstChild("Overhead")
+					if overhead and overhead:IsA("BillboardGui") then
+						local content = overhead:FindFirstChild("Content")
+						if content and content:IsA("Frame") then
+							local header = content:FindFirstChild("Header", true)
+							if header and header:IsA("TextLabel") then
+								nameText = header.Text
+							end
+						end
+					end
+					if not nameText or nameText == "" then
+						nameText = model.Name
+					end
+					map[nameText] = handle
+					table.insert(results, nameText)
+				end
+			end
+		end
+
+		return results, map
+	end
+
+	-- Initial scan
+	local totemValues, totemMap = scanTotems()
+	local selectedTotem = nil
+
+	local TotemDropdown = TotemsSection:AddDropdown({
+		Name = "Select Totem",
+		Default = (totemValues and #totemValues > 0) and totemValues[1] or nil,
+		Multi = false,
+		Values = totemValues,
+		Callback = function(v)
+			selectedTotem = v
+		end,
+	})
+
+	TotemsSection:AddButton({
+		Name = "Refresh Totems",
+		Callback = function()
+			local vals, mp = scanTotems()
+			totemValues = vals
+			totemMap = mp
+			selectedTotem = nil
+			if TotemDropdown and TotemDropdown.SetValue then
+				-- clear selection; UI library may refresh options on its own
+				pcall(function() TotemDropdown:SetValue(nil) end)
+			end
+			Notifier.new({Title = "Totems", Content = "Refreshed totems (found " .. tostring(#totemValues) .. ")", Duration = 3, Icon = "rbxassetid://124426992222665"})
+		end,
+	})
+
+	TotemsSection:AddButton({
+		Name = "Teleport to Selected Totem",
+		Callback = function()
+			pcall(function()
+				if not selectedTotem or selectedTotem == "" then
+					Notifier.new({Title = "Totems", Content = "No totem selected", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					return
+				end
+				local handle = totemMap and totemMap[selectedTotem]
+				if not handle then
+					Notifier.new({Title = "Totems", Content = "Selected totem not found (try Refresh)", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					return
+				end
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					player.Character.HumanoidRootPart.CFrame = CFrame.new(handle.Position + Vector3.new(0, 3, 0))
+					Notifier.new({Title = "Totems", Content = "Teleported to " .. tostring(selectedTotem), Duration = 2, Icon = "rbxassetid://124426992222665"})
+				end
+			end)
+		end,
+	})
+
+	TotemsSection:AddButton({
+		Name = "Teleport to Nearest Totem",
+		Callback = function()
+			pcall(function()
+				local ws = game:GetService("Workspace")
+				local root = ws:FindFirstChild("Totems")
+				if not root then
+					Notifier.new({Title = "Totems", Content = "No Totems model found in workspace", Duration = 3, Icon = "rbxassetid://124426992222665"})
+					return
+				end
+				if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
+					return
+				end
+				local hrp = player.Character.HumanoidRootPart
+				local nearest, nearestDist, nearestHandle = nil, math.huge, nil
+				for _, model in ipairs(root:GetChildren()) do
+					if model and model:IsA("Model") then
+						local handle = model:FindFirstChild("Handle", true)
+						if handle and handle:IsA("BasePart") then
+							local d = (hrp.Position - handle.Position).Magnitude
+							if d < nearestDist then
+								nearestDist = d
+								nearest = model
+								nearestHandle = handle
+							end
+						end
+					end
+				end
+				if nearestHandle then
+					player.Character.HumanoidRootPart.CFrame = CFrame.new(nearestHandle.Position + Vector3.new(0, 3, 0))
+					Notifier.new({Title = "Totems", Content = "Teleported to nearest totem: " .. tostring(nearest and nearest.Name or "unknown"), Duration = 2, Icon = "rbxassetid://124426992222665"})
+				else
+					Notifier.new({Title = "Totems", Content = "No active totems found", Duration = 3, Icon = "rbxassetid://124426992222665"})
+				end
+			end)
+		end,
+	})
 
 	-- Enchant Section
 	local EnchantSection = ShopTab:DrawSection({
