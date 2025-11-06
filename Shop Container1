@@ -1,4 +1,4 @@
--- Shop Contav8iner (Automatically Tab)
+-- Shop Containerv9 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -506,26 +506,40 @@ return function(config)
 
 				local function attemptUse()
 					pcall(function()
-						local inventoryPotions = playerData:Get({ "Inventory", "Potions" }) or {}
+						local inventory = {}
+						-- Try to get inventory table robustly
+						pcall(function()
+							inventory = playerData:GetExpect("Inventory") or {}
+						end)
 						local didUse = false
 						for _, selectedName in ipairs(getSelectedPotions()) do
 							local potionData = potionByName[selectedName]
 							if potionData and potionData.Data and potionData.Data.Id then
-								for _, entry in pairs(inventoryPotions) do
-									if entry and entry.Id == potionData.Data.Id then
-										-- entry.UUID expected; invoke remote
-										pcall(function()
-											ConsumePotionRemote:InvokeServer(entry.UUID, 1)
-										end)
-										Notifier.new({
-										Title = "Auto Use Potions",
-										Content = "Used potion: " .. tostring(selectedName),
-										Duration = 2,
-										Icon = "rbxassetid://124426992222665"
-										})
-										didUse = true
-										task.wait(0.6) -- small spacing between uses
-										break
+								local targetId = potionData.Data.Id
+								-- Search all inventory categories for a matching Id
+								for _, category in pairs(inventory) do
+									for _, entry in pairs(category or {}) do
+										if entry and entry.Id == targetId then
+											-- Prefer UUID if available, otherwise fall back to Id
+											local ok, _ = pcall(function()
+												if entry.UUID then
+													ConsumePotionRemote:InvokeServer(entry.UUID, 1)
+												else
+													ConsumePotionRemote:InvokeServer(entry.Id, 1)
+												end
+											end)
+											if ok then
+												Notifier.new({
+													Title = "Auto Use Potions",
+													Content = "Used potion: " .. tostring(selectedName),
+													Duration = 2,
+													Icon = "rbxassetid://124426992222665"
+												})
+												didUse = true
+												task.wait(0.6)
+												break
+											end
+										end
 									end
 								end
 							end
