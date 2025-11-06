@@ -1,982 +1,491 @@
--- Quest Container for Fishit Script-- Quest Container for Fishit Script
-
-return function(config)return function(config)
-
-	local Compkiller = config.Compkiller	local Compkiller = config.Compkiller
-
-	local Notifier = config.Notifier	local Notifier = config.Notifier
-
-	local player = config.player	local player = config.player
-
-	local replion = config.replion	local replion = config.replion
-
-	local ItemUtility = config.ItemUtility	local ItemUtility = config.ItemUtility
-
-	local TierUtility = config.TierUtility	local TierUtility = config.TierUtility
-
-	local RunService = config.RunService	local RunService = config.RunService
-
-	local ReplicatedStorage = config.ReplicatedStorage	local ReplicatedStorage = config.ReplicatedStorage
-
-
-
-	-- Quest Variables	-- Quest Variables
-
-	local autoSisyphusQuestEnabled = false	local autoSisyphusQuestEnabled = false
-
-	local sisyphusQuestConnection = nil	local sisyphusQuestConnection = nil
-
-	local sisyphusAutoSellConnection = nil	local sisyphusAutoSellConnection = nil
-
-	local sisyphusAutoEquipActive = false	local sisyphusAutoEquipActive = false
-
-	local QuestUtility = require(ReplicatedStorage.Shared.Quests.QuestUtility)	local QuestUtility = require(ReplicatedStorage.Shared.Quests.QuestUtility)
-
-	local QuestList = require(ReplicatedStorage.Shared.Quests.QuestList)	local QuestList = require(ReplicatedStorage.Shared.Quests.QuestList)
-
-	local lastQuestProgress = {	local lastQuestProgress = {
-
-		treasureRoom = {completed = false},		treasureRoom = {completed = false},
-
-		mythicSisyphus = {completed = false},		mythicSisyphus = {completed = false},
-
-		secretSisyphus = {completed = false},		secretSisyphus = {completed = false},
-
-		earnCoins = {completed = false}		earnCoins = {completed = false}
-
-	}	}
-
-
-
-	-- Quest Functions	-- Quest Functions
-
-	local function teleportToLocation(cframe)	local function teleportToLocation(cframe)
-
-		local character = player.Character		local character = player.Character
-
-		if character and character:FindFirstChild("HumanoidRootPart") then		if character and character:FindFirstChild("HumanoidRootPart") then
-
-			character.HumanoidRootPart.CFrame = cframe			character.HumanoidRootPart.CFrame = cframe
-
-		end		end
-
-	end	end
-
-
-
-	local function getDeepSeaQuestProgress()	local function getDeepSeaQuestProgress()
-
-		local success, deepSeaData = pcall(function()		local success, deepSeaData = pcall(function()
-
-			return replion:Get({"DeepSea", "Available", "Forever"})			return replion:Get({"DeepSea", "Available", "Forever"})
-
-		end)		end)
-
-
-
-		if not success or not deepSeaData or not deepSeaData.Quests then		if not success or not deepSeaData or not deepSeaData.Quests then
-
-			return nil			return nil
-
-		end		end
-
-
-
-		local progress = {		local progress = {
-
-			treasureRoom = {completed = false, current = 0, needed = 300},			treasureRoom = {completed = false, current = 0, needed = 300},
-
-			mythicSisyphus = {completed = false, current = 0, needed = 3},			mythicSisyphus = {completed = false, current = 0, needed = 3},
-
-			secretSisyphus = {completed = false, current = 0, needed = 1},			secretSisyphus = {completed = false, current = 0, needed = 1},
-
-			earnCoins = {completed = false, current = 0, needed = 1000000}			earnCoins = {completed = false, current = 0, needed = 1000000}
-
-		}		}
-
-
-
-		for _, quest in ipairs(deepSeaData.Quests) do		for _, quest in ipairs(deepSeaData.Quests) do
-
-			local ok, questData = pcall(function()			local ok, questData = pcall(function()
-
-				return QuestUtility:GetQuestData("DeepSea", "Forever", quest.QuestId)				return QuestUtility:GetQuestData("DeepSea", "Forever", quest.QuestId)
-
-			end)			end)
-
-
-
-			if ok and questData then			if ok and questData then
-
-				if questData.Arguments.key == "CatchRareTreasureRoom" then				if questData.Arguments.key == "CatchRareTreasureRoom" then
-
-					progress.treasureRoom.current = quest.Progress or 0					progress.treasureRoom.current = quest.Progress or 0
-
-					progress.treasureRoom.completed = quest.Redeemed or false					progress.treasureRoom.completed = quest.Redeemed or false
-
-				elseif questData.Arguments.key == "CatchFish" then				elseif questData.Arguments.key == "CatchFish" then
-
-					if questData.Arguments.conditions and questData.Arguments.conditions.Tier == 6 then					if questData.Arguments.conditions and questData.Arguments.conditions.Tier == 6 then
-
-						progress.mythicSisyphus.current = quest.Progress or 0						progress.mythicSisyphus.current = quest.Progress or 0
-
-						progress.mythicSisyphus.completed = quest.Redeemed or false						progress.mythicSisyphus.completed = quest.Redeemed or false
-
-					elseif questData.Arguments.conditions and questData.Arguments.conditions.Tier == 7 then					elseif questData.Arguments.conditions and questData.Arguments.conditions.Tier == 7 then
-
-						progress.secretSisyphus.current = quest.Progress or 0						progress.secretSisyphus.current = quest.Progress or 0
-
-						progress.secretSisyphus.completed = quest.Redeemed or false						progress.secretSisyphus.completed = quest.Redeemed or false
-
-					end					end
-
-				elseif questData.Arguments.key == "EarnCoins" then				elseif questData.Arguments.key == "EarnCoins" then
-
-					progress.earnCoins.current = quest.Progress or 0					progress.earnCoins.current = quest.Progress or 0
-
-					progress.earnCoins.completed = quest.Redeemed or false					progress.earnCoins.completed = quest.Redeemed or false
-
-				end				end
-
-			end			end
-
-		end		end
-
-
-
-		return progress		return progress
-
-	end	end
-
-
-
-	local function checkQuestCompletions(progress)	local function checkQuestCompletions(progress)
-
-		if not progress then return end		if not progress then return end
-
-
-
-		-- Check treasure room completion		-- Check treasure room completion
-
-		if progress.treasureRoom.completed and not lastQuestProgress.treasureRoom.completed then		if progress.treasureRoom.completed and not lastQuestProgress.treasureRoom.completed then
-
-			Notifier.new({			Notifier.new({
-
-				Title = "Quest Complete!",				Title = "Quest Complete!",
-
-				Content = "Treasure Room quest completed!",				Content = "Treasure Room quest completed!",
-
-				Duration = 4,				Duration = 4,
-
-				Icon = "rbxassetid://124426992222665"				Icon = "rbxassetid://124426992222665"
-
-			})			})
-
-			lastQuestProgress.treasureRoom.completed = true			lastQuestProgress.treasureRoom.completed = true
-
-		end		end
-
-
-
-		-- Check mythic sisyphus completion		-- Check mythic sisyphus completion
-
-		if progress.mythicSisyphus.completed and not lastQuestProgress.mythicSisyphus.completed then		if progress.mythicSisyphus.completed and not lastQuestProgress.mythicSisyphus.completed then
-
-			Notifier.new({			Notifier.new({
-
-				Title = "Quest Complete!",				Title = "Quest Complete!",
-
-				Content = "Caught 3 Mythic fish at Sisyphus Statue!",				Content = "Caught 3 Mythic fish at Sisyphus Statue!",
-
-				Duration = 4,				Duration = 4,
-
-				Icon = "rbxassetid://124426992222665"				Icon = "rbxassetid://124426992222665"
-
-			})			})
-
-			lastQuestProgress.mythicSisyphus.completed = true			lastQuestProgress.mythicSisyphus.completed = true
-
-		end		end
-
-
-
-		-- Check secret sisyphus completion		-- Check secret sisyphus completion
-
-		if progress.secretSisyphus.completed and not lastQuestProgress.secretSisyphus.completed then		if progress.secretSisyphus.completed and not lastQuestProgress.secretSisyphus.completed then
-
-			Notifier.new({			Notifier.new({
-
-				Title = "Quest Complete!",				Title = "Quest Complete!",
-
-				Content = "Caught 1 SECRET fish at Sisyphus Statue!",				Content = "Caught 1 SECRET fish at Sisyphus Statue!",
-
-				Duration = 4,				Duration = 4,
-
-				Icon = "rbxassetid://124426992222665"				Icon = "rbxassetid://124426992222665"
-
-			})			})
-
-			lastQuestProgress.secretSisyphus.completed = true			lastQuestProgress.secretSisyphus.completed = true
-
-		end		end
-
-
-
-		-- Check earn coins completion		-- Check earn coins completion
-
-		if progress.earnCoins.completed and not lastQuestProgress.earnCoins.completed then		if progress.earnCoins.completed and not lastQuestProgress.earnCoins.completed then
-
-			Notifier.new({			Notifier.new({
-
-				Title = "Quest Complete!",				Title = "Quest Complete!",
-
-				Content = "Earned 1M coins!",				Content = "Earned 1M coins!",
-
-				Duration = 4,				Duration = 4,
-
-				Icon = "rbxassetid://124426992222665"				Icon = "rbxassetid://124426992222665"
-
-			})			})
-
-			lastQuestProgress.earnCoins.completed = true			lastQuestProgress.earnCoins.completed = true
-
-		end		end
-
-	end	end
-
-
-
-	local function startSisyphusAutoSell()	local function startSisyphusAutoSell()
-
-		if sisyphusAutoSellConnection then		if sisyphusAutoSellConnection then
-
-			sisyphusAutoSellConnection:Disconnect()			sisyphusAutoSellConnection:Disconnect()
-
-		end		end
-
-
-
-		sisyphusAutoSellConnection = RunService.Heartbeat:Connect(function()		sisyphusAutoSellConnection = RunService.Heartbeat:Connect(function()
-
-			if autoSisyphusQuestEnabled then			if autoSisyphusQuestEnabled then
-
-				task.wait(60)				task.wait(60)
-
-				if autoSisyphusQuestEnabled then				if autoSisyphusQuestEnabled then
-
-					config.sellAllItems()					config.sellAllItems()
-
-				end				end
-
-			end			end
-
-		end)		end)
-
-	end	end
-
-
-
-	local function stopSisyphusAutoSell()	local function stopSisyphusAutoSell()
-
-		if sisyphusAutoSellConnection then		if sisyphusAutoSellConnection then
-
-			sisyphusAutoSellConnection:Disconnect()			sisyphusAutoSellConnection:Disconnect()
-
-			sisyphusAutoSellConnection = nil			sisyphusAutoSellConnection = nil
-
-		end		end
-
-	end	end
-
-
-
-	local function startSisyphusLegitFish()	local function startSisyphusLegitFish()
-
-		-- Use the main legit auto fish function		-- Use the main legit auto fish function
-
-		config.StartLegitAutoFish()		config.StartLegitAutoFish()
-
-	end	end
-
-
-
-	local function stopSisyphusLegitFish()	local function stopSisyphusLegitFish()
-
-		-- Use the main legit auto fish stop function		-- Use the main legit auto fish stop function
-
-		config.StopLegitAutoFish()		config.StopLegitAutoFish()
-
-	end	end
-
-
-
-	local function autoSisyphusQuest()	local function autoSisyphusQuest()
-
-		if not autoSisyphusQuestEnabled then return end		if not autoSisyphusQuestEnabled then return end
-
-
-
-		local progress = getDeepSeaQuestProgress()		local progress = getDeepSeaQuestProgress()
-
-		if not progress then		if not progress then
-
-			return			return
-
-		end		end
-
-
-
-		-- Check for quest completions and notify		-- Check for quest completions and notify
-
-		checkQuestCompletions(progress)		checkQuestCompletions(progress)
-
-
-
-		-- Check if all quests are completed		-- Check if all quests are completed
-
-		if progress.treasureRoom.completed and progress.mythicSisyphus.completed and		if progress.treasureRoom.completed and progress.mythicSisyphus.completed and
-
-		   progress.secretSisyphus.completed and progress.earnCoins.completed then		   progress.secretSisyphus.completed and progress.earnCoins.completed then
-
-			Notifier.new({			Notifier.new({
-
-				Title = "All Quests Complete!",				Title = "All Quests Complete!",
-
-				Content = "All Sisyphus quests completed!",				Content = "All Sisyphus quests completed!",
-
-				Duration = 5,				Duration = 5,
-
-				Icon = "rbxassetid://124426992222665"				Icon = "rbxassetid://124426992222665"
-
-			})			})
-
-			autoSisyphusQuestEnabled = false			autoSisyphusQuestEnabled = false
-
-			stopSisyphusLegitFish()			stopSisyphusLegitFish()
-
-			stopSisyphusAutoSell()			stopSisyphusAutoSell()
-
-			if sisyphusAutoEquipActive then			if sisyphusAutoEquipActive then
-
-				config.autoEquipRodEnabled = false				config.autoEquipRodEnabled = false
-
-				config.stopAutoEquipRod()				config.stopAutoEquipRod()
-
-				sisyphusAutoEquipActive = false				sisyphusAutoEquipActive = false
-
-			end			end
-
-			return			return
-
-		end		end
-
-
-
-		-- Prioritize Treasure Room first		-- Prioritize Treasure Room first
-
-		if not progress.treasureRoom.completed then		if not progress.treasureRoom.completed then
-
-			teleportToLocation(CFrame.new(-3612.15186, -279.07373, -1590.27075, 0.975584984, 4.07164746e-09, 0.219622254, -3.51511065e-09, 1, -2.92483215e-09, -0.219622254, 2.08142592e-09, 0.975584984))			teleportToLocation(CFrame.new(-3612.15186, -279.07373, -1590.27075, 0.975584984, 4.07164746e-09, 0.219622254, -3.51511065e-09, 1, -2.92483215e-09, -0.219622254, 2.08142592e-09, 0.975584984))
-
-			startSisyphusLegitFish()			startSisyphusLegitFish()
-
-			return			return
-
-		end		end
-
-
-
-		-- Then do Sisyphus Statue quests		-- Then do Sisyphus Statue quests
-
-		if not progress.mythicSisyphus.completed or not progress.secretSisyphus.completed then		if not progress.mythicSisyphus.completed or not progress.secretSisyphus.completed then
-
-			teleportToLocation(CFrame.new(-3697.83984, -135.073914, -1009.05469, -0.909938157, -1.01421245e-08, 0.41474393, -1.63995253e-08, 1, -1.15262182e-08, -0.41474393, -1.72897501e-08, -0.909938157))			teleportToLocation(CFrame.new(-3697.83984, -135.073914, -1009.05469, -0.909938157, -1.01421245e-08, 0.41474393, -1.63995253e-08, 1, -1.15262182e-08, -0.41474393, -1.72897501e-08, -0.909938157))
-
-			startSisyphusLegitFish()			startSisyphusLegitFish()
-
-			return			return
-
-		end		end
-
-	end	end
-
-
-
-	local function startAutoSisyphusQuest()	local function startAutoSisyphusQuest()
-
-		if sisyphusQuestConnection then		if sisyphusQuestConnection then
-
-			sisyphusQuestConnection:Disconnect()			sisyphusQuestConnection:Disconnect()
-
-		end		end
-
-
-
-		startSisyphusAutoSell()		startSisyphusAutoSell()
-
-
-
-		-- Initial run		-- Initial run
-
-		autoSisyphusQuest()		autoSisyphusQuest()
-
-
-
-		-- Check progress every 10 seconds		-- Check progress every 10 seconds
-
-		sisyphusQuestConnection = RunService.Heartbeat:Connect(function()		sisyphusQuestConnection = RunService.Heartbeat:Connect(function()
-
-			if autoSisyphusQuestEnabled then			if autoSisyphusQuestEnabled then
-
-				task.wait(10)				task.wait(10)
-
-				if autoSisyphusQuestEnabled then				if autoSisyphusQuestEnabled then
-
-					autoSisyphusQuest()					autoSisyphusQuest()
-
-				end				end
-
-			end			end
-
-		end)		end)
-
-	end	end
-
-
-
-	local function stopAutoSisyphusQuest()	local function stopAutoSisyphusQuest()
-
-		if sisyphusQuestConnection then		if sisyphusQuestConnection then
-
-			sisyphusQuestConnection:Disconnect()			sisyphusQuestConnection:Disconnect()
-
-			sisyphusQuestConnection = nil			sisyphusQuestConnection = nil
-
-		end		end
-
-		stopSisyphusLegitFish()		stopSisyphusLegitFish()
-
-		stopSisyphusAutoSell()		stopSisyphusAutoSell()
-
-		if sisyphusAutoEquipActive then		if sisyphusAutoEquipActive then
-
-			config.autoEquipRodEnabled = false			config.autoEquipRodEnabled = false
-
-			config.stopAutoEquipRod()			config.stopAutoEquipRod()
-
-			sisyphusAutoEquipActive = false			sisyphusAutoEquipActive = false
-
-		end		end
-
-	end	end
-
-
-
-	-- Artifact Quest Variables	-- Artifact Quest Variables
-
-	local autoArtifactQuestEnabled = false	local autoArtifactQuestEnabled = false
-
-	local artifactQuestConnection = nil	local artifactQuestConnection = nil
-
-	local artifactAutoEquipActive = false	local artifactAutoEquipActive = false
-
-	local REPlaceLeverItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/PlaceLeverItem"]	local REPlaceLeverItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/PlaceLeverItem"]
-
-
-
-	local artifactLocations = {	local artifactLocations = {
-
-		["Arrow Artifact"] = {		["Arrow Artifact"] = {
-
-			fishing = CFrame.new(875, 3.5851419, -368, -4.37113883e-08, 5.28800331e-14, 1, -3.78722424e-14, 1, -5.28800365e-14, -1, -3.78722458e-14, -4.37113883e-08),			fishing = CFrame.new(875, 3.5851419, -368, -4.37113883e-08, 5.28800331e-14, 1, -3.78722424e-14, 1, -5.28800365e-14, -1, -3.78722458e-14, -4.37113883e-08),
-
-			lever = CFrame.new(894.369385, 7.62499952, -362.468811, -0.120959446, -4.98329703e-28, -0.992657423, 8.9658238e-29, 1, -5.12941011e-28, 0.992657423, -1.5104498e-28, -0.120959446)			lever = CFrame.new(894.369385, 7.62499952, -362.468811, -0.120959446, -4.98329703e-28, -0.992657423, 8.9658238e-29, 1, -5.12941011e-28, 0.992657423, -1.5104498e-28, -0.120959446)
-
-		},		},
-
-		["Hourglass Diamond Artifact"] = {		["Hourglass Diamond Artifact"] = {
-
-			fishing = CFrame.new(1487, 2.85160041, -842, -1, 2.12817375e-17, -8.74227766e-08, 2.12817392e-17, 1, -1.52248068e-17, 8.74227766e-08, -1.52248084e-17, -1),			fishing = CFrame.new(1487, 2.85160041, -842, -1, 2.12817375e-17, -8.74227766e-08, 2.12817392e-17, 1, -1.52248068e-17, 8.74227766e-08, -1.52248084e-17, -1),
-
-			lever = CFrame.new(1823.07703, 7.62499952, -285.498108, 0.00773190008, 6.53080931e-17, 0.999970138, -4.33290076e-17, 1, -6.49750173e-17, -0.999970138, -4.28253307e-17, 0.00773190008)			lever = CFrame.new(1823.07703, 7.62499952, -285.498108, 0.00773190008, 6.53080931e-17, 0.999970138, -4.33290076e-17, 1, -6.49750173e-17, -0.999970138, -4.28253307e-17, 0.00773190008)
-
-		},		},
-
-		["Crescent Artifact"] = {		["Crescent Artifact"] = {
-
-			fishing = CFrame.new(1403, 3.16851115, 123, -1, 2.07791922e-17, -8.74227766e-08, 2.07791939e-17, 1, -1.48684772e-17, 8.74227766e-08, -1.48684789e-17, -1),			fishing = CFrame.new(1403, 3.16851115, 123, -1, 2.07791922e-17, -8.74227766e-08, 2.07791939e-17, 1, -1.48684772e-17, 8.74227766e-08, -1.48684789e-17, -1),
-
-			lever = CFrame.new(1416.52271, 30.3749981, 77.642952, -0.314893961, 1.19910881e-08, -0.94912684, -5.40732081e-08, 1, 3.05738013e-08, 0.94912684, 6.09498372e-08, -0.314893961)			lever = CFrame.new(1416.52271, 30.3749981, 77.642952, -0.314893961, 1.19910881e-08, -0.94912684, -5.40732081e-08, 1, 3.05738013e-08, 0.94912684, 6.09498372e-08, -0.314893961)
-
-		},		},
-
-		["Diamond Artifact"] = {		["Diamond Artifact"] = {
-
-			fishing = CFrame.new(1844, 2.8596704, -287, -4.37113883e-08, 4.04220046e-18, -1, 2.89315849e-18, 1, 4.04220046e-18, 1, -2.89315828e-18, -4.37113883e-08),			fishing = CFrame.new(1844, 2.8596704, -287, -4.37113883e-08, 4.04220046e-18, -1, 2.89315849e-18, 1, 4.04220046e-18, 1, -2.89315828e-18, -4.37113883e-08),
-
-			lever = CFrame.new(1822.39221, 7.62499952, -285.074829, -0.171147242, -2.18039979e-27, 0.985245466, 1.89709338e-27, 1, 2.54259692e-27, -0.985245466, 2.30426116e-27, -0.171147242)			lever = CFrame.new(1822.39221, 7.62499952, -285.074829, -0.171147242, -2.18039979e-27, 0.985245466, 1.89709338e-27, 1, 2.54259692e-27, -0.985245466, 2.30426116e-27, -0.171147242)
-
-		}		}
-
-	}	}
-
-
-
-	local function hasArtifactInInventory(artifactName)	local function hasArtifactInInventory(artifactName)
-
-		local items = config.getFishInventory()		local items = config.getFishInventory()
-
-		for _, item in ipairs(items) do		for _, item in ipairs(items) do
-
-			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
-
-			if itemData and itemData.Data.Name == artifactName then			if itemData and itemData.Data.Name == artifactName then
-
-				return true, item				return true, item
-
-			end			end
-
-		end		end
-
-		return false, nil		return false, nil
-
-	end	end
-
-
-
-	local function isArtifactPlaced(artifactName)	local function isArtifactPlaced(artifactName)
-
-		local success, templeLevers = pcall(function()		local success, templeLevers = pcall(function()
-
-			return replion:Get({"TempleLevers"})			return replion:Get({"TempleLevers"})
-
-		end)		end)
-
-		if success and templeLevers then		if success and templeLevers then
-
-			return templeLevers[artifactName] or false			return templeLevers[artifactName] or false
-
-		end		end
-
-		return false		return false
-
-	end	end
-
-
-
-	local function equipArtifact(artifactName)	local function equipArtifact(artifactName)
-
-		local items = config.getFishInventory()		local items = config.getFishInventory()
-
-		for _, item in ipairs(items) do		for _, item in ipairs(items) do
-
-			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
-
-			if itemData and itemData.Data.Name == artifactName then			if itemData and itemData.Data.Name == artifactName then
-
-				pcall(function()				pcall(function()
-
-					local equipRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipGear"]					local equipRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipGear"]
-
-					equipRemote:FireServer(item.UUID)					equipRemote:FireServer(item.UUID)
-
-				end)				end)
-
-				return true				return true
-
-			end			end
-
-		end		end
-
-		return false		return false
-
-	end	end
-
-
-
-	local function placeArtifact(artifactName)	local function placeArtifact(artifactName)
-
-		pcall(function()		pcall(function()
-
-			REPlaceLeverItem:FireServer(artifactName)			REPlaceLeverItem:FireServer(artifactName)
-
-		end)		end)
-
-	end	end
-
-
-
-	local function startArtifactLegitFish()	local function startArtifactLegitFish()
-
-		-- Use the main legit auto fish function		-- Use the main legit auto fish function
-
-		config.StartLegitAutoFish()		config.StartLegitAutoFish()
-
-	end	end
-
-
-
-	local function stopArtifactLegitFish()	local function stopArtifactLegitFish()
-
-		-- Use the main legit auto fish stop function		-- Use the main legit auto fish stop function
-
-		config.StopLegitAutoFish()		config.StopLegitAutoFish()
-
-	end	end
-
-
-
-	local lastNotifiedArtifact = nil	local lastNotifiedArtifact = nil
-
-
-
-	local function autoArtifactQuest()	local function autoArtifactQuest()
-
-		if not autoArtifactQuestEnabled then return end		if not autoArtifactQuestEnabled then return end
-
-
-
-		for artifactName, locations in pairs(artifactLocations) do		for artifactName, locations in pairs(artifactLocations) do
-
-			if not isArtifactPlaced(artifactName) then			if not isArtifactPlaced(artifactName) then
-
-				local hasArtifact, artifactItem = hasArtifactInInventory(artifactName)				local hasArtifact, artifactItem = hasArtifactInInventory(artifactName)
-
-
-
-				if hasArtifact then				if hasArtifact then
-
-					if lastNotifiedArtifact ~= artifactName then					if lastNotifiedArtifact ~= artifactName then
-
-						stopArtifactLegitFish()						stopArtifactLegitFish()
-
-						task.wait(0.5)						task.wait(0.5)
-
-
-
-						Notifier.new({						Notifier.new({
-
-							Title = "Artifact Found!",							Title = "Artifact Found!",
-
-							Content = artifactName .. " obtained!",							Content = artifactName .. " obtained!",
-
-							Duration = 3,							Duration = 3,
-
-							Icon = "rbxassetid://124426992222665"							Icon = "rbxassetid://124426992222665"
-
-						})						})
-
-
-
-						lastNotifiedArtifact = artifactName						lastNotifiedArtifact = artifactName
-
-					end					end
-
-
-
-					equipArtifact(artifactName)					equipArtifact(artifactName)
-
-					task.wait(0.5)					task.wait(0.5)
-
-
-
-					teleportToLocation(locations.lever)					teleportToLocation(locations.lever)
-
-					task.wait(1)					task.wait(1)
-
-
-
-					placeArtifact(artifactName)					placeArtifact(artifactName)
-
-					task.wait(2)					task.wait(2)
-
-
-
-					Notifier.new({					Notifier.new({
-
-						Title = "Artifact Placed!",						Title = "Artifact Placed!",
-
-						Content = artifactName .. " placed successfully",						Content = artifactName .. " placed successfully",
-
-						Duration = 3,						Duration = 3,
-
-						Icon = "rbxassetid://124426992222665"						Icon = "rbxassetid://124426992222665"
-
-					})					})
-
-
-
-					lastNotifiedArtifact = nil					lastNotifiedArtifact = nil
-
-				else				else
-
-					teleportToLocation(locations.fishing)					teleportToLocation(locations.fishing)
-
-					task.wait(1)					task.wait(1)
-
-					startArtifactLegitFish()					startArtifactLegitFish()
-
-					return					return
-
-				end				end
-
-			end			end
-
-		end		end
-
-
-
-		Notifier.new({		Notifier.new({
-
-			Title = "Quest Complete!",			Title = "Quest Complete!",
-
-			Content = "All artifacts placed!",			Content = "All artifacts placed!",
-
-			Duration = 5,			Duration = 5,
-
-			Icon = "rbxassetid://124426992222665"			Icon = "rbxassetid://124426992222665"
-
-		})		})
-
-		autoArtifactQuestEnabled = false		autoArtifactQuestEnabled = false
-
-		stopArtifactLegitFish()		stopArtifactLegitFish()
-
-		if artifactAutoEquipActive then		if artifactAutoEquipActive then
-
-			config.autoEquipRodEnabled = false			config.autoEquipRodEnabled = false
-
-			config.stopAutoEquipRod()			config.stopAutoEquipRod()
-
-			artifactAutoEquipActive = false			artifactAutoEquipActive = false
-
-		end		end
-
-	end	end
-
-
-
-	local function startAutoArtifactQuest()	local function startAutoArtifactQuest()
-
-		if artifactQuestConnection then		if artifactQuestConnection then
-
-			artifactQuestConnection:Disconnect()			artifactQuestConnection:Disconnect()
-
-		end		end
-
-
-
-		autoArtifactQuest()		autoArtifactQuest()
-
-
-
-		artifactQuestConnection = RunService.Heartbeat:Connect(function()		artifactQuestConnection = RunService.Heartbeat:Connect(function()
-
-			if autoArtifactQuestEnabled then			if autoArtifactQuestEnabled then
-
-				task.wait(5)				task.wait(5)
-
-				if autoArtifactQuestEnabled then				if autoArtifactQuestEnabled then
-
-					autoArtifactQuest()					autoArtifactQuest()
-
-				end				end
-
-			end			end
-
-		end)		end)
-
-	end	end
-
-
-
-	local function stopAutoArtifactQuest()	local function stopAutoArtifactQuest()
-
-		if artifactQuestConnection then		if artifactQuestConnection then
-
-			artifactQuestConnection:Disconnect()			artifactQuestConnection:Disconnect()
-
-			artifactQuestConnection = nil			artifactQuestConnection = nil
-
-		end		end
-
-		stopArtifactLegitFish()		stopArtifactLegitFish()
-
-		if artifactAutoEquipActive then		if artifactAutoEquipActive then
-
-			config.autoEquipRodEnabled = false			config.autoEquipRodEnabled = false
-
-			config.stopAutoEquipRod()			config.stopAutoEquipRod()
-
-			artifactAutoEquipActive = false			artifactAutoEquipActive = false
-
-		end		end
-
-	end	end
-
-
-
-	-- Quests Section	-- Quests Section
-
-	local QuestsSection = config.QuestTab:DrawSection({	local QuestsSection = config.QuestTab:DrawSection({
-
-		Name = "Quests",		Name = "Quests",
-
-	});	});
-
-
-
-	QuestsSection:AddToggle({	QuestsSection:AddToggle({
-
-		Name = "Auto Artifact Quest",		Name = "Auto Artifact Quest",
-
-		Default = false,		Default = false,
-
-		Callback = function(Value)		Callback = function(Value)
-
-			if Value then			if Value then
-
-				Notifier.new({				Notifier.new({
-
-					Title = "Auto Artifact Quest Started",					Title = "Auto Artifact Quest Started",
-
-					Content = "Fishing for artifacts...",					Content = "Fishing for artifacts...",
-
-					Duration = 3,					Duration = 3,
-
-					Icon = "rbxassetid://124426992222665"					Icon = "rbxassetid://124426992222665"
-
-				})				})
-
-
-
-				if not config.autoEquipRodEnabled then				if not config.autoEquipRodEnabled then
-
-					config.autoEquipRodEnabled = true					config.autoEquipRodEnabled = true
-
-					artifactAutoEquipActive = true					artifactAutoEquipActive = true
-
-					config.startAutoEquipRod()					config.startAutoEquipRod()
-
-				end				end
-
-
-
-				autoArtifactQuestEnabled = true				autoArtifactQuestEnabled = true
-
-				startAutoArtifactQuest()				startAutoArtifactQuest()
-
-			else			else
-
-				autoArtifactQuestEnabled = false				autoArtifactQuestEnabled = false
-
-				stopAutoArtifactQuest()				stopAutoArtifactQuest()
-
-
-
-				Notifier.new({				Notifier.new({
-
-					Title = "Auto Artifact Stopped",					Title = "Auto Artifact Stopped",
-
-					Content = "Artifact quest stopped",					Content = "Artifact quest stopped",
-
-					Duration = 2,					Duration = 2,
-
-					Icon = "rbxassetid://124426992222665"					Icon = "rbxassetid://124426992222665"
-
-				})				})
-
-			end			end
-
-		end,		end,
-
-	});	});
-
-
-
-	QuestsSection:AddToggle({	QuestsSection:AddToggle({
-
-		Name = "Auto Sisyphus Quest",		Name = "Auto Sisyphus Quest",
-
-		Default = false,		Default = false,
-
-		Callback = function(Value)		Callback = function(Value)
-
-			if Value then			if Value then
-
-				-- Show confirmation popup				-- Show confirmation popup
-
-				Notifier.new({				Notifier.new({
-
-					Title = "Auto Sisyphus Quest",					Title = "Auto Sisyphus Quest",
-
-					Content = "This will:\n• Auto fish at locations\n• Auto sell every 1 minute\n• Auto equip rod\n• Teleport between areas",					Content = "This will:\n• Auto fish at locations\n• Auto sell every 1 minute\n• Auto equip rod\n• Teleport between areas",
-
-					Duration = 8,					Duration = 8,
-
-					Icon = "rbxassetid://124426992222665"					Icon = "rbxassetid://124426992222665"
-
-				})				})
-
-
-
-				-- Enable auto equip rod				-- Enable auto equip rod
-
-				if not config.autoEquipRodEnabled then				if not config.autoEquipRodEnabled then
-
-					config.autoEquipRodEnabled = true					config.autoEquipRodEnabled = true
-
-					sisyphusAutoEquipActive = true					sisyphusAutoEquipActive = true
-
-					config.startAutoEquipRod()					config.startAutoEquipRod()
-
-				end				end
-
-
-
-				autoSisyphusQuestEnabled = true				autoSisyphusQuestEnabled = true
-
-				startAutoSisyphusQuest()				startAutoSisyphusQuest()
-
-
-
-				Notifier.new({				Notifier.new({
-
-					Title = "Auto Quest Started",					Title = "Auto Quest Started",
-
-					Content = "Sisyphus Statue quest automation started",					Content = "Sisyphus Statue quest automation started",
-
-					Duration = 3,					Duration = 3,
-
-					Icon = "rbxassetid://124426992222665"					Icon = "rbxassetid://124426992222665"
-
-				})				})
-
-			else			else
-
-				autoSisyphusQuestEnabled = false				autoSisyphusQuestEnabled = false
-
-				stopAutoSisyphusQuest()				stopAutoSisyphusQuest()
-
-
-
-				Notifier.new({				Notifier.new({
-
-					Title = "Auto Quest Stopped",					Title = "Auto Quest Stopped",
-
-					Content = "Quest automation stopped",					Content = "Quest automation stopped",
-
-					Duration = 2,					Duration = 2,
-
-					Icon = "rbxassetid://124426992222665"					Icon = "rbxassetid://124426992222665"
-
-				})				})
-
-			end			end
-
-		end,		end,
-
-	});	});
-
-endend</content>
-<parameter name="filePath">c:\Users\thebi\Documents\fishit.lockin\Containers\QuestContainer.lua
+-- Quest Container for Fishit Script
+return function(config)
+	local Compkiller = config.Compkiller
+	local Notifier = config.Notifier
+	local player = config.player
+	local replion = config.replion
+	local ItemUtility = config.ItemUtility
+	local TierUtility = config.TierUtility
+	local RunService = config.RunService
+	local ReplicatedStorage = config.ReplicatedStorage
+
+	-- Quest Variables
+	local autoSisyphusQuestEnabled = false
+	local sisyphusQuestConnection = nil
+	local sisyphusAutoSellConnection = nil
+	local sisyphusAutoEquipActive = false
+	local QuestUtility = require(ReplicatedStorage.Shared.Quests.QuestUtility)
+	local QuestList = require(ReplicatedStorage.Shared.Quests.QuestList)
+	local lastQuestProgress = {
+		treasureRoom = {completed = false},
+		mythicSisyphus = {completed = false},
+		secretSisyphus = {completed = false},
+		earnCoins = {completed = false}
+	}
+
+	-- Artifact Quest Variables
+	local autoArtifactQuestEnabled = false
+	local artifactQuestConnection = nil
+	local artifactAutoEquipActive = false
+	local REPlaceLeverItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/PlaceLeverItem"]
+
+	local artifactLocations = {
+		["Arrow Artifact"] = {
+			fishing = CFrame.new(875, 3.5851419, -368, -4.37113883e-08, 5.28800331e-14, 1, -3.78722424e-14, 1, -5.28800365e-14, -1, -3.78722458e-14, -4.37113883e-08),
+			lever = CFrame.new(894.369385, 7.62499952, -362.468811, -0.120959446, -4.98329703e-28, -0.992657423, 8.9658238e-29, 1, -5.12941011e-28, 0.992657423, -1.5104498e-28, -0.120959446)
+		},
+		["Hourglass Diamond Artifact"] = {
+			fishing = CFrame.new(1487, 2.85160041, -842, -1, 2.12817375e-17, -8.74227766e-08, 2.12817392e-17, 1, -1.52248068e-17, 8.74227766e-08, -1.52248084e-17, -1),
+			lever = CFrame.new(1823.07703, 7.62499952, -285.498108, 0.00773190008, 6.53080931e-17, 0.999970138, -4.33290076e-17, 1, -6.49750173e-17, -0.999970138, -4.28253307e-17, 0.00773190008)
+		},
+		["Crescent Artifact"] = {
+			fishing = CFrame.new(1403, 3.16851115, 123, -1, 2.07791922e-17, -8.74227766e-08, 2.07791939e-17, 1, -1.48684772e-17, 8.74227766e-08, -1.48684789e-17, -1),
+			lever = CFrame.new(1416.52271, 30.3749981, 77.642952, -0.314893961, 1.19910881e-08, -0.94912684, -5.40732081e-08, 1, 3.05738013e-08, 0.94912684, 6.09498372e-08, -0.314893961)
+		},
+		["Diamond Artifact"] = {
+			fishing = CFrame.new(1844, 2.8596704, -287, -4.37113883e-08, 4.04220046e-18, -1, 2.89315849e-18, 1, 4.04220046e-18, 1, -2.89315828e-18, -4.37113883e-08),
+			lever = CFrame.new(1822.39221, 7.62499952, -285.074829, -0.171147242, -2.18039979e-27, 0.985245466, 1.89709338e-27, 1, 2.54259692e-27, -0.985245466, 2.30426116e-27, -0.171147242)
+		}
+	}
+
+	-- Quest Functions
+	local function teleportToLocation(cframe)
+		local character = player.Character
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			character.HumanoidRootPart.CFrame = cframe
+		end
+	end
+
+	local function getDeepSeaQuestProgress()
+		local success, deepSeaData = pcall(function()
+			return replion:Get({"DeepSea", "Available", "Forever"})
+		end)
+
+		if not success or not deepSeaData or not deepSeaData.Quests then
+			return nil
+		end
+
+		local progress = {
+			treasureRoom = {completed = false, current = 0, needed = 300},
+			mythicSisyphus = {completed = false, current = 0, needed = 3},
+			secretSisyphus = {completed = false, current = 0, needed = 1},
+			earnCoins = {completed = false, current = 0, needed = 1000000}
+		}
+
+		for _, quest in ipairs(deepSeaData.Quests) do
+			local ok, questData = pcall(function()
+				return QuestUtility:GetQuestData("DeepSea", "Forever", quest.QuestId)
+			end)
+
+			if ok and questData then
+				if questData.Arguments.key == "CatchRareTreasureRoom" then
+					progress.treasureRoom.current = quest.Progress or 0
+					progress.treasureRoom.completed = quest.Redeemed or false
+				elseif questData.Arguments.key == "CatchFish" then
+					if questData.Arguments.conditions and questData.Arguments.conditions.Tier == 6 then
+						progress.mythicSisyphus.current = quest.Progress or 0
+						progress.mythicSisyphus.completed = quest.Redeemed or false
+					elseif questData.Arguments.conditions and questData.Arguments.conditions.Tier == 7 then
+						progress.secretSisyphus.current = quest.Progress or 0
+						progress.secretSisyphus.completed = quest.Redeemed or false
+					end
+				elseif questData.Arguments.key == "EarnCoins" then
+					progress.earnCoins.current = quest.Progress or 0
+					progress.earnCoins.completed = quest.Redeemed or false
+				end
+			end
+		end
+
+		return progress
+	end
+
+	local function checkQuestCompletions(progress)
+		if not progress then return end
+
+		-- Check treasure room completion
+		if progress.treasureRoom.completed and not lastQuestProgress.treasureRoom.completed then
+			Notifier.new({
+				Title = "Quest Complete!",
+				Content = "Treasure Room quest completed!",
+				Duration = 4,
+				Icon = "rbxassetid://124426992222665"
+			})
+			lastQuestProgress.treasureRoom.completed = true
+		end
+
+		-- Check mythic sisyphus completion
+		if progress.mythicSisyphus.completed and not lastQuestProgress.mythicSisyphus.completed then
+			Notifier.new({
+				Title = "Quest Complete!",
+				Content = "Caught 3 Mythic fish at Sisyphus Statue!",
+				Duration = 4,
+				Icon = "rbxassetid://124426992222665"
+			})
+			lastQuestProgress.mythicSisyphus.completed = true
+		end
+
+		-- Check secret sisyphus completion
+		if progress.secretSisyphus.completed and not lastQuestProgress.secretSisyphus.completed then
+			Notifier.new({
+				Title = "Quest Complete!",
+				Content = "Caught 1 SECRET fish at Sisyphus Statue!",
+				Duration = 4,
+				Icon = "rbxassetid://124426992222665"
+			})
+			lastQuestProgress.secretSisyphus.completed = true
+		end
+
+		-- Check earn coins completion
+		if progress.earnCoins.completed and not lastQuestProgress.earnCoins.completed then
+			Notifier.new({
+				Title = "Quest Complete!",
+				Content = "Earned 1M coins!",
+				Duration = 4,
+				Icon = "rbxassetid://124426992222665"
+			})
+			lastQuestProgress.earnCoins.completed = true
+		end
+	end
+
+	local function startSisyphusAutoSell()
+		if sisyphusAutoSellConnection then
+			sisyphusAutoSellConnection:Disconnect()
+		end
+
+		sisyphusAutoSellConnection = RunService.Heartbeat:Connect(function()
+			if autoSisyphusQuestEnabled then
+				task.wait(60)
+				if autoSisyphusQuestEnabled then
+					config.sellAllItems()
+				end
+			end
+		end)
+	end
+
+	local function stopSisyphusAutoSell()
+		if sisyphusAutoSellConnection then
+			sisyphusAutoSellConnection:Disconnect()
+			sisyphusAutoSellConnection = nil
+		end
+	end
+
+	local function startSisyphusLegitFish()
+		-- Use the main legit auto fish function
+		config.StartLegitAutoFish()
+	end
+
+	local function stopSisyphusLegitFish()
+		-- Use the main legit auto fish stop function
+		config.StopLegitAutoFish()
+	end
+
+	local function autoSisyphusQuest()
+		if not autoSisyphusQuestEnabled then return end
+
+		local progress = getDeepSeaQuestProgress()
+		if not progress then
+			return
+		end
+
+		-- Check for quest completions and notify
+		checkQuestCompletions(progress)
+
+		-- Check if all quests are completed
+		if progress.treasureRoom.completed and progress.mythicSisyphus.completed and
+		   progress.secretSisyphus.completed and progress.earnCoins.completed then
+			Notifier.new({
+				Title = "All Quests Complete!",
+				Content = "All Sisyphus quests completed!",
+				Duration = 5,
+				Icon = "rbxassetid://124426992222665"
+			})
+			autoSisyphusQuestEnabled = false
+			stopSisyphusLegitFish()
+			stopSisyphusAutoSell()
+			if sisyphusAutoEquipActive then
+				config.autoEquipRodEnabled = false
+				config.stopAutoEquipRod()
+				sisyphusAutoEquipActive = false
+			end
+			return
+		end
+
+		-- Prioritize Treasure Room first
+		if not progress.treasureRoom.completed then
+			teleportToLocation(CFrame.new(-3612.15186, -279.07373, -1590.27075, 0.975584984, 4.07164746e-09, 0.219622254, -3.51511065e-09, 1, -2.92483215e-09, -0.219622254, 2.08142592e-09, 0.975584984))
+			startSisyphusLegitFish()
+			return
+		end
+
+		-- Then do Sisyphus Statue quests
+		if not progress.mythicSisyphus.completed or not progress.secretSisyphus.completed then
+			teleportToLocation(CFrame.new(-3697.83984, -135.073914, -1009.05469, -0.909938157, -1.01421245e-08, 0.41474393, -1.63995253e-08, 1, -1.15262182e-08, -0.41474393, -1.72897501e-08, -0.909938157))
+			startSisyphusLegitFish()
+			return
+		end
+	end
+
+	local function startAutoSisyphusQuest()
+		if sisyphusQuestConnection then
+			sisyphusQuestConnection:Disconnect()
+		end
+
+		startSisyphusAutoSell()
+
+		-- Initial run
+		autoSisyphusQuest()
+
+		-- Check progress every 10 seconds
+		sisyphusQuestConnection = RunService.Heartbeat:Connect(function()
+			if autoSisyphusQuestEnabled then
+				task.wait(10)
+				if autoSisyphusQuestEnabled then
+					autoSisyphusQuest()
+				end
+			end
+		end)
+	end
+
+	local function stopAutoSisyphusQuest()
+		if sisyphusQuestConnection then
+			sisyphusQuestConnection:Disconnect()
+			sisyphusQuestConnection = nil
+		end
+		stopSisyphusLegitFish()
+		stopSisyphusAutoSell()
+		if sisyphusAutoEquipActive then
+			config.autoEquipRodEnabled = false
+			config.stopAutoEquipRod()
+			sisyphusAutoEquipActive = false
+		end
+	end
+
+	local function hasArtifactInInventory(artifactName)
+		local items = config.getFishInventory()
+		for _, item in ipairs(items) do
+			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+			if itemData and itemData.Data.Name == artifactName then
+				return true, item
+			end
+		end
+		return false, nil
+	end
+
+	local function isArtifactPlaced(artifactName)
+		local success, templeLevers = pcall(function()
+			return replion:Get({"TempleLevers"})
+		end)
+		if success and templeLevers then
+			return templeLevers[artifactName] or false
+		end
+		return false
+	end
+
+	local function equipArtifact(artifactName)
+		local items = config.getFishInventory()
+		for _, item in ipairs(items) do
+			local itemData = ItemUtility.GetItemDataFromItemType("Items", item.Id)
+			if itemData and itemData.Data.Name == artifactName then
+				pcall(function()
+					local equipRemote = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipGear"]
+					equipRemote:FireServer(item.UUID)
+				end)
+				return true
+			end
+		end
+		return false
+	end
+
+	local function placeArtifact(artifactName)
+		pcall(function()
+			REPlaceLeverItem:FireServer(artifactName)
+		end)
+	end
+
+	local function startArtifactLegitFish()
+		-- Use the main legit auto fish function
+		config.StartLegitAutoFish()
+	end
+
+	local function stopArtifactLegitFish()
+		-- Use the main legit auto fish stop function
+		config.StopLegitAutoFish()
+	end
+
+	local lastNotifiedArtifact = nil
+
+	local function autoArtifactQuest()
+		if not autoArtifactQuestEnabled then return end
+
+		for artifactName, locations in pairs(artifactLocations) do
+			if not isArtifactPlaced(artifactName) then
+				local hasArtifact, artifactItem = hasArtifactInInventory(artifactName)
+
+				if hasArtifact then
+					if lastNotifiedArtifact ~= artifactName then
+						stopArtifactLegitFish()
+						task.wait(0.5)
+
+						Notifier.new({
+							Title = "Artifact Found!",
+							Content = artifactName .. " obtained!",
+							Duration = 3,
+							Icon = "rbxassetid://124426992222665"
+						})
+
+						lastNotifiedArtifact = artifactName
+					end
+
+					equipArtifact(artifactName)
+					task.wait(0.5)
+
+					teleportToLocation(locations.lever)
+					task.wait(1)
+
+					placeArtifact(artifactName)
+					task.wait(2)
+
+					Notifier.new({
+						Title = "Artifact Placed!",
+						Content = artifactName .. " placed successfully",
+						Duration = 3,
+						Icon = "rbxassetid://124426992222665"
+					})
+
+					lastNotifiedArtifact = nil
+				else
+					teleportToLocation(locations.fishing)
+					task.wait(1)
+					startArtifactLegitFish()
+					return
+				end
+			end
+		end
+
+		Notifier.new({
+			Title = "Quest Complete!",
+			Content = "All artifacts placed!",
+			Duration = 5,
+			Icon = "rbxassetid://124426992222665"
+		})
+		autoArtifactQuestEnabled = false
+		stopArtifactLegitFish()
+		if artifactAutoEquipActive then
+			config.autoEquipRodEnabled = false
+			config.stopAutoEquipRod()
+			artifactAutoEquipActive = false
+		end
+	end
+
+	local function startAutoArtifactQuest()
+		if artifactQuestConnection then
+			artifactQuestConnection:Disconnect()
+		end
+
+		autoArtifactQuest()
+
+		artifactQuestConnection = RunService.Heartbeat:Connect(function()
+			if autoArtifactQuestEnabled then
+				task.wait(5)
+				if autoArtifactQuestEnabled then
+					autoArtifactQuest()
+				end
+			end
+		end)
+	end
+
+	local function stopAutoArtifactQuest()
+		if artifactQuestConnection then
+			artifactQuestConnection:Disconnect()
+			artifactQuestConnection = nil
+		end
+		stopArtifactLegitFish()
+		if artifactAutoEquipActive then
+			config.autoEquipRodEnabled = false
+			config.stopAutoEquipRod()
+			artifactAutoEquipActive = false
+		end
+	end
+
+	-- Quests Section
+	local QuestsSection = config.QuestTab:DrawSection({
+		Name = "Quests",
+	});
+
+	QuestsSection:AddToggle({
+		Name = "Auto Artifact Quest",
+		Default = false,
+		Callback = function(Value)
+			if Value then
+				Notifier.new({
+					Title = "Auto Artifact Quest Started",
+					Content = "Fishing for artifacts...",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+
+				if not config.autoEquipRodEnabled then
+					config.autoEquipRodEnabled = true
+					artifactAutoEquipActive = true
+					config.startAutoEquipRod()
+				end
+
+				autoArtifactQuestEnabled = true
+				startAutoArtifactQuest()
+			else
+				autoArtifactQuestEnabled = false
+				stopAutoArtifactQuest()
+
+				Notifier.new({
+					Title = "Auto Artifact Stopped",
+					Content = "Artifact quest stopped",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	QuestsSection:AddToggle({
+		Name = "Auto Sisyphus Quest",
+		Default = false,
+		Callback = function(Value)
+			if Value then
+				-- Show confirmation popup
+				Notifier.new({
+					Title = "Auto Sisyphus Quest",
+					Content = "This will:\n• Auto fish at locations\n• Auto sell every 1 minute\n• Auto equip rod\n• Teleport between areas",
+					Duration = 8,
+					Icon = "rbxassetid://124426992222665"
+				})
+
+				-- Enable auto equip rod
+				if not config.autoEquipRodEnabled then
+					config.autoEquipRodEnabled = true
+					sisyphusAutoEquipActive = true
+					config.startAutoEquipRod()
+				end
+
+				autoSisyphusQuestEnabled = true
+				startAutoSisyphusQuest()
+
+				Notifier.new({
+					Title = "Auto Quest Started",
+					Content = "Sisyphus Statue quest automation started",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				autoSisyphusQuestEnabled = false
+				stopAutoSisyphusQuest()
+
+				Notifier.new({
+					Title = "Auto Quest Stopped",
+					Content = "Quest automation stopped",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+end
