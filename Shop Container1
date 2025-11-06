@@ -1,4 +1,4 @@
--- Shop Containev11r (Automatically Tab)
+-- Shop Containerv111 (Automatically Tab)
 -- This file contains all UI elements for the Shop/Automatically tab
 -- Includes: Merchant, Save Position, Fishing Rods, Baits, Utilities
 
@@ -68,8 +68,8 @@ return function(config)
 	local getSelectedBobber = config.getSelectedBobber
 	local getSelectedUtility = config.getSelectedUtility
 	local getSelectedWeather = config.getSelectedWeather
-	
-	-- Variables for Merchant
+
+		-- Auto-use toggle
 	local merchantGuiOpen = false
 	local GuiControl = require(ReplicatedStorage.Modules.GuiControl)
 	
@@ -502,166 +502,9 @@ return function(config)
 		end,
 	});
 
-	PotionSection:AddButton({
-		Name = "Debug Selected Potion",
-		Callback = function()
-			local selected = normalizeSelectedPotions(getSelectedPotions())
-				if not selected or type(selected) ~= "table" or #selected == 0 then
-				Notifier.new({
-					Title = "Debug Potions",
-					Content = "No potions selected to debug",
-					Duration = 3,
-					Icon = "rbxassetid://124426992222665"
-				})
-				return
-			end
 
-			local foundAny = false
-			local potionsInInv = getPlayerPotions()
-			for _, selName in ipairs(selected) do
-				local pData = potionByName[selName]
-				if not pData then
-					Notifier.new({Title = "Debug Potions", Content = "No potion data for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
-				else
-					local targetId = pData.Data and pData.Data.Id
-					local matches = {}
-					for _, info in ipairs(potionsInInv) do
-						local entry = info.Entry
-						if entry then
-							if tostring(entry.Id) == tostring(targetId) or (entry.Metadata and tostring(entry.Metadata.Id) == tostring(targetId)) then
-								table.insert(matches, {Category = info.Category, Index = info.Index, Entry = entry})
-							end
-						end
-					end
 
-					if #matches == 0 then
-						Notifier.new({Title = "Debug Potions", Content = "No inventory entries found for "..tostring(selName), Duration = 4, Icon = "rbxassetid://124426992222665"})
-						print("[DebugPotions] No entries for", selName, "(Id=", tostring(targetId), ")")
-					else
-						foundAny = true
-						local m = matches[1]
-						local entry = m.Entry
-						local summary = string.format("Found %d match(es) for %s — Category=%s Index=%s Id=%s UUID=%s", #matches, tostring(selName), tostring(m.Category), tostring(m.Index), tostring(entry.Id), tostring(entry.UUID))
-						Notifier.new({Title = "Debug Potions", Content = summary, Duration = 6, Icon = "rbxassetid://124426992222665"})
-						print("[DebugPotions] ", summary)
-						pcall(function()
-							local HttpService = game:GetService("HttpService")
-							local ok, encoded = pcall(function() return HttpService:JSONEncode(entry) end)
-							if ok and encoded then
-								print("[DebugPotions] Entry JSON:", encoded)
-							else
-								print("[DebugPotions] Entry (raw):", entry)
-							end
-						end)
-					end
-				end
-			end
 
-			if not foundAny then
-				Notifier.new({Title = "Debug Potions", Content = "No matching potion entries found in inventory.", Duration = 4, Icon = "rbxassetid://124426992222665"})
-			end
-		end,
-	})
-
-	PotionSection:AddButton({
-		Name = "Test Consume Selected (will invoke remote)",
-		Callback = function()
-			local selected = normalizeSelectedPotions(getSelectedPotions())
-				if not selected or type(selected) ~= "table" or #selected == 0 then
-				Notifier.new({Title = "Test Consume", Content = "No potions selected to test", Duration = 3, Icon = "rbxassetid://124426992222665"})
-				return
-			end
-
-			local potionsInInv = getPlayerPotions()
-
-			-- Acquire remote directly (match your test invocation)
-			local ConsumeRemote = nil
-			pcall(function()
-				ConsumeRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RF/ConsumePotion")
-			end)
-			if not ConsumeRemote then
-				-- fallback to Net
-				local Net = nil
-				pcall(function()
-					Net = require(ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"] and ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net or ReplicatedStorage.Packages.Net)
-				end)
-				if Net then
-					ConsumeRemote = Net:RemoteFunction("ConsumePotion")
-				end
-			end
-
-			if not ConsumeRemote then
-				Notifier.new({Title = "Test Consume", Content = "Could not find ConsumePotion remote", Duration = 3, Icon = "rbxassetid://124426992222665"})
-				return
-			end
-
-			for _, selName in ipairs(selected) do
-				local pData = potionByName[selName]
-				if not pData then
-					Notifier.new({Title = "Test Consume", Content = "No potion data for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
-				else
-					local targetId = pData.Data and pData.Data.Id
-					local consumed = false
-					for _, info in ipairs(potionsInInv) do
-						local entry = info.Entry
-						if entry and (tostring(entry.Id) == tostring(targetId) or (entry.Metadata and tostring(entry.Metadata.Id) == tostring(targetId))) then
-							local args = {entry.UUID or entry.Id, 1}
-							local ok, res = pcall(function() return ConsumeRemote:InvokeServer(unpack(args)) end)
-							print("[TestConsume] Called ConsumePotion with", unpack(args), "=>", ok, res)
-							Notifier.new({Title = "Test Consume", Content = string.format("Tried consume %s (Id=%s UUID=%s) => %s", tostring(selName), tostring(entry.Id), tostring(entry.UUID), tostring(ok)), Duration = 4, Icon = "rbxassetid://124426992222665"})
-							consumed = ok
-							break
-						end
-					end
-					if not consumed then
-						Notifier.new({Title = "Test Consume", Content = "No matching inventory entry to test for "..tostring(selName), Duration = 3, Icon = "rbxassetid://124426992222665"})
-					end
-				end
-			end
-		end,
-	})
-
-	PotionSection:AddButton({
-		Name = "Dump Potions (raw)",
-		Callback = function()
-			local selected = normalizeSelectedPotions(getSelectedPotions())
-				print("[DumpPotions] Selected names:")
-				for i, n in ipairs(selected) do print("  ", i, n) end
-			print("[DumpPotions] potionByName keys:")
-			for k, v in pairs(potionByName) do print("  ", k, v and (v.Data and v.Data.Id or "<no id>") or "<nil>") end
-
-			local potionsInInv = getPlayerPotions()
-			print("[DumpPotions] Potions in Inventory (count):", #potionsInInv)
-			for i, info in ipairs(potionsInInv) do
-				local entry = info.Entry
-				local ok, json = pcall(function()
-					local HttpService = game:GetService("HttpService")
-					return HttpService:JSONEncode({Index = info.Index, Id = entry.Id, UUID = entry.UUID, Metadata = entry.Metadata})
-				end)
-				if ok then
-					print("[DumpPotions] ", i, json)
-				else
-					print("[DumpPotions] ", i, "(could not encode)", entry)
-				end
-			end
-
-			-- Try totals via containerConfig helper if available
-			if config.getPlayerPotionTotals then
-				local totals = config.getPlayerPotionTotals()
-				print("[DumpPotions] Totals:")
-				for k, v in pairs(totals) do
-					print(string.format("  %s (Id=%s) total=%s", tostring(v.Name), tostring(v.Id), tostring(v.Total)))
-					for uuidKey, q in pairs(v.UUIDs or {}) do
-						print("    UUID:", uuidKey, "x", tostring(q))
-					end
-				end
-			else
-				print("[DumpPotions] No getPlayerPotionTotals available on config")
-			end
-
-			Notifier.new({Title = "Dump Potions", Content = "Printed raw potion info to console", Duration = 4, Icon = "rbxassetid://124426992222665"})
-		end,
-	})
 
 	-- Auto-use toggle
 	local potionAutoConnection = nil
