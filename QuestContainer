@@ -1,0 +1,178 @@
+-- Quest Container
+-- Provides a simple UI for viewing quest positions and teleporting/tracking them.
+
+return function(config)
+	local QuestTab = config.QuestTab
+	local Notifier = config.Notifier
+	local player = config.player
+	local ReplicatedStorage = config.ReplicatedStorage
+	local replion = config.replion
+
+	local QuestSection = QuestTab:DrawSection({
+		Name = "Quests"
+	})
+
+	-- Paragraph for status
+	local statusParagraph = QuestSection:AddParagraph({
+		Title = "Quest Positions",
+		Content = "No quests scanned yet"
+	})
+
+	-- Dropdown (will be populated by scan)
+	local questDropdown = QuestSection:AddDropdown({
+		Name = "Select Quest",
+		Default = "",
+		Values = {"(none)"}
+	})
+
+	-- internal storage for scanned quests: { name = {Positions = {...}, Category = k, Index = i} }
+	local scannedQuests = {}
+
+	local function scanQuestList()
+		local ok, qlist = pcall(function()
+			return require(ReplicatedStorage.Shared.Quests.QuestList)
+		end)
+		if not ok or not qlist then
+			statusParagraph:SetText("Unable to load QuestList module")
+			return
+		end
+
+		-- collect quests that expose TrackQuestCFrame (positions)
+		scannedQuests = {}
+		local count = 0
+		for categoryName, categoryTbl in pairs(qlist) do
+			if type(categoryTbl) == "table" then
+				for listName, listTbl in pairs(categoryTbl) do
+					-- looking for nested lists like Forever
+					if type(listTbl) == "table" then
+						for idx, questDef in ipairs(listTbl) do
+							if type(questDef) == "table" and questDef.TrackQuestCFrame then
+								local display = questDef.DisplayName or (categoryName .. " #" .. tostring(idx))
+								scannedQuests[display] = {
+								Positions = questDef.TrackQuestCFrame,
+								Category = categoryName,
+								Index = idx,
+							}
+								count = count + 1
+							end
+						end
+					end
+				end
+			end
+		end
+
+		-- Build dropdown values
+		local names = {}
+		for name, _ in pairs(scannedQuests) do
+			table.insert(names, name)
+		end
+		table.sort(names)
+		if #names == 0 then names = {"(no quests with positions)"} end
+
+		questDropdown:SetValues(names)
+		statusParagraph:SetText(string.format("Found %d quests with positions", count))
+	end
+
+	QuestSection:AddButton({
+		Name = "Refresh Quests",
+		Callback = function()
+			scanQuestList()
+			Notifier.new({
+				Title = "Quests",
+				Content = "Quest list refreshed",
+				Duration = 2,
+				Icon = "rbxassetid://124426992222665"
+			})
+		end
+	})
+
+	QuestSection:AddButton({
+		Name = "Teleport to Selected",
+		Callback = function()
+			local sel = questDropdown:GetValue()
+			if not sel or sel == "" or sel == "(no quests with positions)" then
+				Notifier.new({Title = "Quests", Content = "No quest selected", Duration = 2, Icon = "rbxassetid://124426992222665"})
+				return
+			end
+			local info = scannedQuests[sel]
+			if not info or not info.Positions then
+				Notifier.new({Title = "Quests", Content = "Selected quest has no positions", Duration = 2, Icon = "rbxassetid://124426992222665"})
+				return
+			end
+			local pos = nil
+			if typeof(info.Positions) == "CFrame" then
+				pos = info.Positions
+			elseif type(info.Positions) == "table" and #info.Positions > 0 then
+				-- pick first
+				pos = info.Positions[1]
+			end
+			if not pos then
+				Notifier.new({Title = "Quests", Content = "No valid CFrame found for quest", Duration = 2})
+				return
+			end
+			pcall(function()
+				local char = player.Character
+				if char and char:FindFirstChild("HumanoidRootPart") then
+					char.HumanoidRootPart.CFrame = pos + Vector3.new(0, 3, 0)
+				end
+			end)
+		end,
+	})
+
+	QuestSection:AddButton({
+		Name = "Teleport to Nearest",
+		Callback = function()
+			local char = player.Character
+			if not char or not char:FindFirstChild("HumanoidRootPart") then
+				Notifier.new({Title = "Quests", Content = "Character not available", Duration = 2})
+				return
+			end
+			local hrp = char.HumanoidRootPart
+			local bestPos, bestMag
+			for name, info in pairs(scannedQuests) do
+				local pts = info.Positions
+				if pts then
+					if typeof(pts) == "CFrame" then
+						local mag = (hrp.Position - pts.Position).Magnitude
+						if not bestMag or mag < bestMag then
+							bestMag = mag
+							bestPos = pts
+						end
+					elseif type(pts) == "table" then
+						for _, cf in ipairs(pts) do
+							local mag = (hrp.Position - cf.Position).Magnitude
+							if not bestMag or mag < bestMag then
+								bestMag = mag
+								bestPos = cf
+							end
+						end
+					end
+				end
+			end
+			if bestPos then
+				pcall(function()
+					char.HumanoidRootPart.CFrame = bestPos + Vector3.new(0, 3, 0)
+				end)
+			else
+				Notifier.new({Title = "Quests", Content = "No quest positions scanned", Duration = 2})
+			end
+		end,
+	})
+
+	QuestSection:AddButton({
+		Name = "Open Quest Controller UI (game)",
+		Callback = function()
+			pcall(function()
+				local GuiControl = require(ReplicatedStorage.Modules.GuiControl)
+				if GuiControl:IsOpen("Quest") then
+					GuiControl:Close()
+				else
+					GuiControl:Open("Quest")
+				end
+			end)
+		end,
+	})
+
+	-- Initial scan on load
+	scanQuestList()
+end
