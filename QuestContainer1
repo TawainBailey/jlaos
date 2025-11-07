@@ -1,4 +1,4 @@
--- Quest Container for Fishit Script
+-- Quest Container for Fishit Scriptv3
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -828,7 +828,7 @@ return function(config)
 			if Value then
 				Notifier.new({
 					Title = "Auto Artifact Quest Started",
-					Content = "Fishing for artifacts...",
+					Content = "Wait, fishing starting soon...",
 					Duration = 3,
 					Icon = "rbxassetid://124426992222665"
 				})
@@ -868,6 +868,15 @@ return function(config)
 					Icon = "rbxassetid://124426992222665"
 				})
 
+				task.wait(1) -- Brief pause after confirmation
+
+				Notifier.new({
+					Title = "Auto Quest Started",
+					Content = "Wait, fishing starting soon...",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+
 				-- Enable auto equip rod
 				if not config.autoEquipRodEnabled then
 					config.autoEquipRodEnabled = true
@@ -877,13 +886,6 @@ return function(config)
 
 				autoSisyphusQuestEnabled = true
 				startAutoSisyphusQuest()
-
-				Notifier.new({
-					Title = "Auto Quest Started",
-					Content = "Sisyphus Statue quest automation started",
-					Duration = 3,
-					Icon = "rbxassetid://124426992222665"
-				})
 			else
 				autoSisyphusQuestEnabled = false
 				stopAutoSisyphusQuest()
