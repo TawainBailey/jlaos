@@ -1,4 +1,4 @@
--- Quest Container for Fishit Scriptv7
+-- Quest Container for Fishit Scriptv9
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -892,6 +892,36 @@ return function(config)
 				destroySisyphusProgressGUI()
 				Notifier.new({
 					Title = "Sisyphus Progress GUI",
+					Content = "Progress GUI closed",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
+		end,
+	});
+
+	-- Progress GUI Section
+	local ProgressSection = config.QuestTab:DrawSection({
+		Name = "Progress GUI",
+	});
+
+	ProgressSection:AddToggle({
+		Name = "Artifact Collection Progress",
+		Default = false,
+		Callback = function(Value)
+			artifactProgressEnabled = Value
+			if Value then
+				createArtifactProgressGUI()
+				Notifier.new({
+					Title = "Artifact Collection Progress GUI",
+					Content = "Progress GUI opened",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			else
+				destroyArtifactProgressGUI()
+				Notifier.new({
+					Title = "Artifact Collection Progress GUI",
 					Content = "Progress GUI closed",
 					Duration = 2,
 					Icon = "rbxassetid://124426992222665"
