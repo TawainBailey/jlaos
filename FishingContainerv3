@@ -1,4 +1,4 @@
--- Fishing Containerv6
+-- Fishing Containerv0
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -193,6 +193,18 @@ return function(config)
 		if isInMinigame then
 			if lastMinigameStart == 0 then
 				lastMinigameStart = currentTime
+				-- Save position when minigame starts (if not already saved)
+				if not originalPosition then
+					originalPosition = character.HumanoidRootPart.CFrame
+				end
+				-- Save rod equipped state when minigame starts
+				local replion = config.replion
+				if replion then
+					pcall(function()
+						local equippedType = replion:GetExpect("EquippedType")
+						wasRodEquipped = (equippedType == "Fishing Rods")
+					end)
+				end
 			elseif currentTime - lastMinigameStart > maxMinigameTime then
 				-- Player is stuck! Reset character
 				Notifier.new({
@@ -205,15 +217,6 @@ return function(config)
 				-- Store current position if not already stored
 				if not originalPosition then
 					originalPosition = character.HumanoidRootPart.CFrame
-				end
-				
-				-- Check if rod was equipped
-				local replion = config.replion
-				if replion then
-					pcall(function()
-						local equippedType = replion:GetExpect("EquippedType")
-						wasRodEquipped = (equippedType == "Fishing Rods")
-					end)
 				end
 				
 				-- Reset character
@@ -230,12 +233,31 @@ return function(config)
 					task.wait(1) -- Wait for character to load
 					newCharacter.HumanoidRootPart.CFrame = originalPosition
 					
-					-- Re-equip rod if it was equipped
+					-- Re-equip rod if it was equipped (with retry logic)
 					if wasRodEquipped then
 						task.wait(0.5)
-						pcall(function()
-							config.equipRod()
-						end)
+						local maxRetries = 3
+						for i = 1, maxRetries do
+							pcall(function()
+								config.equipRod()
+							end)
+							task.wait(0.2)
+							
+							-- Check if rod is now equipped
+							local replion = config.replion
+							if replion then
+								local success, equippedType = pcall(function()
+									return replion:GetExpect("EquippedType")
+								end)
+								if success and equippedType == "Fishing Rods" then
+									break -- Rod equipped successfully
+								end
+							end
+							
+							if i < maxRetries then
+								task.wait(0.3) -- Wait before retry
+							end
+						end
 					end
 					
 					Notifier.new({
@@ -257,6 +279,30 @@ return function(config)
 	local function startUnstuckMonitor()
 		if unstuckConnection then
 			unstuckConnection:Disconnect()
+		end
+		
+		-- Save current fishing position immediately if player is fishing
+		local player = config.player
+		local character = player.Character
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			local isCurrentlyFishing = false
+			if config.FishingController then
+				pcall(function()
+					if config.FishingController:GetCurrentGUID() then
+						isCurrentlyFishing = true
+					end
+				end)
+			end
+			
+			if isCurrentlyFishing then
+				originalPosition = character.HumanoidRootPart.CFrame
+				Notifier.new({
+					Title = "Position Saved",
+					Content = "Current fishing location saved for UnStuck",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				})
+			end
 		end
 		
 		unstuckConnection = config.RunService.Heartbeat:Connect(function()
