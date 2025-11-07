@@ -1,4 +1,4 @@
--- Fishing Containerv2
+-- Fishing Containerv3
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -167,12 +167,13 @@ return function(config)
 		
 		-- Check if player is in a minigame
 		local isInMinigame = false
-		pcall(function()
-			local FishingController = config.FishingController or require(config.ReplicatedStorage.Controllers.FishingController)
-			if FishingController and FishingController:GetCurrentGUID() then
-				isInMinigame = true
-			end
-		end)
+		if config.FishingController then
+			pcall(function()
+				if config.FishingController:GetCurrentGUID() then
+					isInMinigame = true
+				end
+			end)
+		end
 		
 		local currentTime = tick()
 		
