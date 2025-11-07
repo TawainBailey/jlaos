@@ -1,4 +1,4 @@
--- Quest Container for Fishit Scriptv8
+-- Quest Container for Fishit Script
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -64,9 +64,11 @@ return function(config)
 			
 			character.HumanoidRootPart.CFrame = cframe
 			
-			-- Re-freeze after teleport
+			-- Re-freeze after teleport only if quest is still active
 			task.wait(0.2)
-			config.freezePlayerForEvent()
+			if autoSisyphusQuestEnabled or autoArtifactQuestEnabled then
+				config.freezePlayerForEvent()
+			end
 		end
 	end
 
@@ -213,15 +215,27 @@ return function(config)
 				Duration = 5,
 				Icon = "rbxassetid://124426992222665"
 			})
+			
+			-- Immediately stop everything
 			autoSisyphusQuestEnabled = false
-			stopSisyphusLegitFish()
+			if sisyphusQuestConnection then
+				sisyphusQuestConnection:Disconnect()
+				sisyphusQuestConnection = nil
+			end
+			if sisyphusAutoSellConnection then
+				sisyphusAutoSellConnection:Disconnect()
+				sisyphusAutoSellConnection = nil
+			end
+			
+			config.StopLegitAutoFish()
 			stopSisyphusAutoSell()
+			
 			if sisyphusAutoEquipActive then
 				config.autoEquipRodEnabled = false
 				config.stopAutoEquipRod()
 				sisyphusAutoEquipActive = false
 			end
-			-- Unfreeze player when quests complete
+			
 			config.unfreezePlayerForEvent()
 			return
 		end
@@ -258,23 +272,38 @@ return function(config)
 				if autoSisyphusQuestEnabled then
 					autoSisyphusQuest()
 				end
+			else
+				-- If disabled, disconnect immediately
+				if sisyphusQuestConnection then
+					sisyphusQuestConnection:Disconnect()
+					sisyphusQuestConnection = nil
+				end
 			end
 		end)
 	end
 
 	local function stopAutoSisyphusQuest()
+		-- Immediately stop everything
+		autoSisyphusQuestEnabled = false
+		
 		if sisyphusQuestConnection then
 			sisyphusQuestConnection:Disconnect()
 			sisyphusQuestConnection = nil
 		end
-		stopSisyphusLegitFish()
+		if sisyphusAutoSellConnection then
+			sisyphusAutoSellConnection:Disconnect()
+			sisyphusAutoSellConnection = nil
+		end
+		
+		config.StopLegitAutoFish()
 		stopSisyphusAutoSell()
+		
 		if sisyphusAutoEquipActive then
 			config.autoEquipRodEnabled = false
 			config.stopAutoEquipRod()
 			sisyphusAutoEquipActive = false
 		end
-		-- Ensure player is unfrozen when quest stops
+		
 		config.unfreezePlayerForEvent()
 	end
 
@@ -365,14 +394,22 @@ return function(config)
 			Duration = 5,
 			Icon = "rbxassetid://124426992222665"
 		})
+		
+		-- Immediately stop everything
 		autoArtifactQuestEnabled = false
-		stopArtifactLegitFish()
+		if artifactQuestConnection then
+			artifactQuestConnection:Disconnect()
+			artifactQuestConnection = nil
+		end
+		
+		config.StopLegitAutoFish()
+		
 		if artifactAutoEquipActive then
 			config.autoEquipRodEnabled = false
 			config.stopAutoEquipRod()
 			artifactAutoEquipActive = false
 		end
-		-- Unfreeze player when collection complete
+		
 		config.unfreezePlayerForEvent()
 	end
 
@@ -389,19 +426,26 @@ return function(config)
 				if autoArtifactQuestEnabled then
 					autoArtifactQuest()
 				end
+			else
+				-- If disabled, disconnect immediately
+				if artifactQuestConnection then
+					artifactQuestConnection:Disconnect()
+					artifactQuestConnection = nil
+				end
 			end
 		end)
 	end
 
 	local function stopAutoArtifactQuest()
-		autoArtifactQuestEnabled = false  -- Set flag first
+		-- Immediately stop everything
+		autoArtifactQuestEnabled = false
 		
 		if artifactQuestConnection then
 			artifactQuestConnection:Disconnect()
 			artifactQuestConnection = nil
 		end
 		
-		stopArtifactLegitFish()  -- Stop fishing immediately
+		config.StopLegitAutoFish()
 		
 		if artifactAutoEquipActive then
 			config.autoEquipRodEnabled = false
@@ -409,7 +453,6 @@ return function(config)
 			artifactAutoEquipActive = false
 		end
 		
-		-- Ensure player is unfrozen when quest stops
 		config.unfreezePlayerForEvent()
 	end
 
@@ -832,10 +875,26 @@ return function(config)
 				autoArtifactQuestEnabled = true
 				startAutoArtifactQuest()
 			else
+				-- Immediately stop everything
 				autoArtifactQuestEnabled = false
-				stopAutoArtifactQuest()
-
-				-- Unfreeze player
+				
+				-- Stop all connections and processes
+				if artifactQuestConnection then
+					artifactQuestConnection:Disconnect()
+					artifactQuestConnection = nil
+				end
+				
+				-- Stop fishing immediately
+				config.StopLegitAutoFish()
+				
+				-- Stop auto equip rod
+				if artifactAutoEquipActive then
+					config.autoEquipRodEnabled = false
+					config.stopAutoEquipRod()
+					artifactAutoEquipActive = false
+				end
+				
+				-- Unfreeze player immediately
 				config.unfreezePlayerForEvent()
 
 				Notifier.new({
@@ -883,10 +942,33 @@ return function(config)
 				autoSisyphusQuestEnabled = true
 				startAutoSisyphusQuest()
 			else
+				-- Immediately stop everything
 				autoSisyphusQuestEnabled = false
-				stopAutoSisyphusQuest()
-
-				-- Unfreeze player
+				
+				-- Stop all connections and processes
+				if sisyphusQuestConnection then
+					sisyphusQuestConnection:Disconnect()
+					sisyphusQuestConnection = nil
+				end
+				if sisyphusAutoSellConnection then
+					sisyphusAutoSellConnection:Disconnect()
+					sisyphusAutoSellConnection = nil
+				end
+				
+				-- Stop fishing immediately
+				config.StopLegitAutoFish()
+				
+				-- Stop auto sell
+				stopSisyphusAutoSell()
+				
+				-- Stop auto equip rod
+				if sisyphusAutoEquipActive then
+					config.autoEquipRodEnabled = false
+					config.stopAutoEquipRod()
+					sisyphusAutoEquipActive = false
+				end
+				
+				-- Unfreeze player immediately
 				config.unfreezePlayerForEvent()
 
 				Notifier.new({
