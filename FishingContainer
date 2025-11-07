@@ -1,4 +1,4 @@
--- Fishing Container
+-- Fishing Containerv2
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -146,6 +146,142 @@ return function(config)
 			local value = tonumber(Text)
 			if value and value >= 0 then
 				setShakeDelay(value)
+			end
+		end,
+	});
+
+	-- UnStuck Variables
+	local unstuckEnabled = false
+	local unstuckConnection = nil
+	local originalPosition = nil
+	local wasRodEquipped = false
+	local lastMinigameStart = 0
+	local maxMinigameTime = 30 -- 30 seconds max for minigame
+
+	local function checkIfStuck()
+		if not unstuckEnabled then return end
+		
+		local player = config.player
+		local character = player.Character
+		if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+		
+		-- Check if player is in a minigame
+		local isInMinigame = false
+		pcall(function()
+			local FishingController = config.FishingController or require(config.ReplicatedStorage.Controllers.FishingController)
+			if FishingController and FishingController:GetCurrentGUID() then
+				isInMinigame = true
+			end
+		end)
+		
+		local currentTime = tick()
+		
+		if isInMinigame then
+			if lastMinigameStart == 0 then
+				lastMinigameStart = currentTime
+			elseif currentTime - lastMinigameStart > maxMinigameTime then
+				-- Player is stuck! Reset character
+				Notifier.new({
+					Title = "UnStuck Activated!",
+					Content = "Detected stuck minigame, resetting character...",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+				
+				-- Store current position if not already stored
+				if not originalPosition then
+					originalPosition = character.HumanoidRootPart.CFrame
+				end
+				
+				-- Check if rod was equipped
+				local replion = config.replion
+				if replion then
+					pcall(function()
+						local equippedType = replion:GetExpect("EquippedType")
+						wasRodEquipped = (equippedType == "Fishing Rods")
+					end)
+				end
+				
+				-- Reset character
+				local humanoid = character:FindFirstChild("Humanoid")
+				if humanoid then
+					humanoid.Health = 0
+				end
+				
+				-- Wait for respawn and teleport back
+				task.wait(2) -- Wait for respawn
+				
+				local newCharacter = player.Character
+				if newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") and originalPosition then
+					task.wait(1) -- Wait for character to load
+					newCharacter.HumanoidRootPart.CFrame = originalPosition
+					
+					-- Re-equip rod if it was equipped
+					if wasRodEquipped then
+						task.wait(0.5)
+						pcall(function()
+							config.REEquipToolFromHotbar:FireServer(1)
+						end)
+					end
+					
+					Notifier.new({
+						Title = "UnStuck Complete",
+						Content = "Teleported back to original location",
+						Duration = 3,
+						Icon = "rbxassetid://124426992222665"
+					})
+				end
+				
+				lastMinigameStart = 0
+			end
+		else
+			-- Not in minigame, reset timer
+			lastMinigameStart = 0
+		end
+	end
+
+	local function startUnstuckMonitor()
+		if unstuckConnection then
+			unstuckConnection:Disconnect()
+		end
+		
+		unstuckConnection = config.RunService.Heartbeat:Connect(function()
+			checkIfStuck()
+		end)
+	end
+
+	local function stopUnstuckMonitor()
+		if unstuckConnection then
+			unstuckConnection:Disconnect()
+			unstuckConnection = nil
+		end
+		lastMinigameStart = 0
+		originalPosition = nil
+		wasRodEquipped = false
+	end
+
+	FishingSection:AddToggle({
+		Name = "UnStuck",
+		Default = false,
+		Callback = function(Value)
+			unstuckEnabled = Value
+			
+			if Value then
+				startUnstuckMonitor()
+				Notifier.new({
+					Title = "UnStuck Enabled",
+					Content = "Will reset character if stuck in minigame >30s",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				});
+			else
+				stopUnstuckMonitor()
+				Notifier.new({
+					Title = "UnStuck Disabled",
+					Content = "UnStuck monitoring stopped",
+					Duration = 2,
+					Icon = "rbxassetid://124426992222665"
+				});
 			end
 		end,
 	});
