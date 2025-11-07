@@ -1,4 +1,4 @@
--- Fishing Containerv9
+-- Fishing Container
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -28,6 +28,7 @@ return function(config)
 	-- Setters for state variables
 	local setLegitDelay = config.setLegitDelay
 	local setShakeDelay = config.setShakeDelay
+	local setManipulationDelay = config.setManipulationDelay
 	local setAutoEquipRodEnabled = config.setAutoEquipRodEnabled
 	local setAutoClickMinigameEnabled = config.setAutoClickMinigameEnabled
 	local setSelectedEvents = config.setSelectedEvents
@@ -146,6 +147,18 @@ return function(config)
 			local value = tonumber(Text)
 			if value and value >= 0 then
 				setShakeDelay(value)
+			end
+		end,
+	});
+
+	FishingSection:AddTextBox({
+		Name = "Manipulation Delay",
+		Default = "0.12",
+		Placeholder = "0.1-1 seconds",
+		Callback = function(Text)
+			local value = tonumber(Text)
+			if value and value >= 0.1 and value <= 1 then
+				setManipulationDelay(value)
 			end
 		end,
 	});
