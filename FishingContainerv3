@@ -1,4 +1,4 @@
--- Fishing Container
+-- Fishing Containerv6
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -234,16 +234,7 @@ return function(config)
 					if wasRodEquipped then
 						task.wait(0.5)
 						pcall(function()
-							-- Use the same method as auto equip rod
-							local replion = config.replion
-							if replion then
-								local success, equippedType = pcall(function()
-									return replion:GetExpect("EquippedType")
-								end)
-								if success and equippedType ~= "Fishing Rods" then
-									config.REEquipToolFromHotbar:FireServer(1)
-								end
-							end
+							config.equipRod()
 						end)
 					end
 					
