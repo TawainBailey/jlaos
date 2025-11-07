@@ -1,4 +1,4 @@
--- Fishing Containerv3
+-- Fishing Containerv9
 -- This file contains all UI elements for the Fishing tab (ExtractTab)
 -- Includes: Auto Fish, Event Fishing, Favorite, and Sell sections
 
@@ -156,7 +156,7 @@ return function(config)
 	local originalPosition = nil
 	local wasRodEquipped = false
 	local lastMinigameStart = 0
-	local maxMinigameTime = 30 -- 30 seconds max for minigame
+	local maxMinigameTime = 20 -- 20 seconds max for minigame
 
 	local function checkIfStuck()
 		if not unstuckEnabled then return end
@@ -221,7 +221,16 @@ return function(config)
 					if wasRodEquipped then
 						task.wait(0.5)
 						pcall(function()
-							config.REEquipToolFromHotbar:FireServer(1)
+							-- Use the same method as auto equip rod
+							local replion = config.replion
+							if replion then
+								local success, equippedType = pcall(function()
+									return replion:GetExpect("EquippedType")
+								end)
+								if success and equippedType ~= "Fishing Rods" then
+									config.REEquipToolFromHotbar:FireServer(1)
+								end
+							end
 						end)
 					end
 					
@@ -271,7 +280,7 @@ return function(config)
 				startUnstuckMonitor()
 				Notifier.new({
 					Title = "UnStuck Enabled",
-					Content = "Will reset character if stuck in minigame >30s",
+					Content = "Will reset character if stuck in minigame >20s",
 					Duration = 3,
 					Icon = "rbxassetid://124426992222665"
 				});
