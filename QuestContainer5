@@ -1,4 +1,4 @@
--- Quest Container for Fishit Scriptv7
+-- Quest Container for Fishit Scriptv8
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -274,6 +274,8 @@ return function(config)
 			config.stopAutoEquipRod()
 			sisyphusAutoEquipActive = false
 		end
+		-- Ensure player is unfrozen when quest stops
+		config.unfreezePlayerForEvent()
 	end
 
 	local function hasArtifactInInventory(artifactName)
@@ -406,6 +408,9 @@ return function(config)
 			config.stopAutoEquipRod()
 			artifactAutoEquipActive = false
 		end
+		
+		-- Ensure player is unfrozen when quest stops
+		config.unfreezePlayerForEvent()
 	end
 
 	-- Progress GUI Functions
