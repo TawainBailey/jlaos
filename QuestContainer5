@@ -1,4 +1,4 @@
--- Quest Container for Fishit Scriptv9
+-- Quest Container for Fishit Scriptv7
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -58,7 +58,15 @@ return function(config)
 	local function teleportToLocation(cframe)
 		local character = player.Character
 		if character and character:FindFirstChild("HumanoidRootPart") then
+			-- Temporarily unfreeze for teleport
+			config.unfreezePlayerForEvent()
+			task.wait(0.1)
+			
 			character.HumanoidRootPart.CFrame = cframe
+			
+			-- Re-freeze after teleport
+			task.wait(0.2)
+			config.freezePlayerForEvent()
 		end
 	end
 
@@ -213,6 +221,8 @@ return function(config)
 				config.stopAutoEquipRod()
 				sisyphusAutoEquipActive = false
 			end
+			-- Unfreeze player when quests complete
+			config.unfreezePlayerForEvent()
 			return
 		end
 
@@ -360,6 +370,8 @@ return function(config)
 			config.stopAutoEquipRod()
 			artifactAutoEquipActive = false
 		end
+		-- Unfreeze player when collection complete
+		config.unfreezePlayerForEvent()
 	end
 
 	local function startAutoArtifactQuest()
@@ -809,11 +821,17 @@ return function(config)
 					config.startAutoEquipRod()
 				end
 
+				-- Freeze player for quest
+				config.freezePlayerForEvent()
+
 				autoArtifactQuestEnabled = true
 				startAutoArtifactQuest()
 			else
 				autoArtifactQuestEnabled = false
 				stopAutoArtifactQuest()
+
+				-- Unfreeze player
+				config.unfreezePlayerForEvent()
 
 				Notifier.new({
 					Title = "Auto Artifact Collection Stopped",
@@ -854,11 +872,17 @@ return function(config)
 					config.startAutoEquipRod()
 				end
 
+				-- Freeze player for quest
+				config.freezePlayerForEvent()
+
 				autoSisyphusQuestEnabled = true
 				startAutoSisyphusQuest()
 			else
 				autoSisyphusQuestEnabled = false
 				stopAutoSisyphusQuest()
+
+				-- Unfreeze player
+				config.unfreezePlayerForEvent()
 
 				Notifier.new({
 					Title = "Auto Quest Stopped",
