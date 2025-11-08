@@ -1,4 +1,4 @@
--- Quest Container for Fishit Script
+-- Quest Container for Fishit Scriptv33
 return function(config)
 	local Compkiller = config.Compkiller
 	local Notifier = config.Notifier
@@ -28,6 +28,18 @@ return function(config)
 	local artifactQuestConnection = nil
 	local artifactAutoEquipActive = false
 	local REPlaceLeverItem = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/PlaceLeverItem"]
+
+	-- Stuck Recovery State (similar to legit auto fish)
+	local originalPosition = nil
+	local lastResetTime = 0
+	local RESET_COOLDOWN = 10
+	local lastCastPosition = nil
+
+	-- Quest Stuck Recovery State
+	local sisyphusQuestStartTime = 0
+	local sisyphusStuckTimeout = 300 -- 5 minutes timeout for sisyphus quest
+	local artifactQuestStartTime = 0
+	local artifactStuckTimeout = 180 -- 3 minutes timeout for artifact quest
 
 	local artifactLocations = {
 		["Arrow Artifact"] = {
@@ -198,6 +210,63 @@ return function(config)
 	local function autoSisyphusQuest()
 		if not autoSisyphusQuestEnabled then return end
 
+		-- Stuck recovery check
+		local currentTime = tick()
+		if sisyphusQuestStartTime > 0 and (currentTime - sisyphusQuestStartTime) >= sisyphusStuckTimeout then
+			print("Sisyphus quest stuck detected! Resetting...")
+			lastResetTime = currentTime
+			local wasEnabled = autoSisyphusQuestEnabled
+			autoSisyphusQuestEnabled = false
+
+			Notifier.new({
+				Title = "Quest Stuck Recovery",
+				Content = "Sisyphus quest stuck detected - resetting character...",
+				Duration = 3,
+				Icon = "rbxassetid://124426992222665"
+			})
+			pcall(function()
+				if player.Character then player.Character:BreakJoints() end
+			end)
+
+			print("Character reset initiated for quest")
+			task.wait(5)
+
+			if wasEnabled then
+				if originalPosition and player.Character then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						print("Teleporting to original position:", originalPosition)
+						hrp.CFrame = CFrame.new(originalPosition)
+						task.wait(0.5)
+					end
+				end
+
+				-- Re-equip rod
+				pcall(function() config.REEquipToolFromHotbar:FireServer(1) end)
+				task.wait(2)
+
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					originalPosition = player.Character.HumanoidRootPart.Position
+					lastCastPosition = originalPosition
+					print("Position updated after reset")
+				end
+
+				Notifier.new({
+					Title = "Recovery Complete",
+					Content = "Quest stuck recovery completed - restarting quest",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+
+				print("Quest stuck recovery completed - restarting auto sisyphus quest")
+				task.wait(1)
+				sisyphusQuestStartTime = tick() -- Reset the timer
+				autoSisyphusQuestEnabled = true -- Re-enable and let the heartbeat restart it
+				autoSisyphusQuest() -- Restart immediately
+			end
+			return
+		end
+
 		local progress = getDeepSeaQuestProgress()
 		if not progress then
 			return
@@ -260,6 +329,9 @@ return function(config)
 			sisyphusQuestConnection:Disconnect()
 		end
 
+		-- Initialize stuck recovery timer
+		sisyphusQuestStartTime = tick()
+
 		startSisyphusAutoSell()
 
 		-- Initial run
@@ -285,6 +357,7 @@ return function(config)
 	local function stopAutoSisyphusQuest()
 		-- Immediately stop everything
 		autoSisyphusQuestEnabled = false
+		sisyphusQuestStartTime = 0 -- Reset timer
 		
 		if sisyphusQuestConnection then
 			sisyphusQuestConnection:Disconnect()
@@ -364,6 +437,63 @@ return function(config)
 	local function autoArtifactQuest()  -- Now just collects artifacts, doesn't place them
 		if not autoArtifactQuestEnabled then return end
 
+		-- Stuck recovery check
+		local currentTime = tick()
+		if artifactQuestStartTime > 0 and (currentTime - artifactQuestStartTime) >= artifactStuckTimeout then
+			print("Artifact quest stuck detected! Resetting...")
+			lastResetTime = currentTime
+			local wasEnabled = autoArtifactQuestEnabled
+			autoArtifactQuestEnabled = false
+
+			Notifier.new({
+				Title = "Quest Stuck Recovery",
+				Content = "Artifact quest stuck detected - resetting character...",
+				Duration = 3,
+				Icon = "rbxassetid://124426992222665"
+			})
+			pcall(function()
+				if player.Character then player.Character:BreakJoints() end
+			end)
+
+			print("Character reset initiated for artifact quest")
+			task.wait(5)
+
+			if wasEnabled then
+				if originalPosition and player.Character then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						print("Teleporting to original position:", originalPosition)
+						hrp.CFrame = CFrame.new(originalPosition)
+						task.wait(0.5)
+					end
+				end
+
+				-- Re-equip rod
+				pcall(function() config.REEquipToolFromHotbar:FireServer(1) end)
+				task.wait(2)
+
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					originalPosition = player.Character.HumanoidRootPart.Position
+					lastCastPosition = originalPosition
+					print("Position updated after reset")
+				end
+
+				Notifier.new({
+					Title = "Recovery Complete",
+					Content = "Quest stuck recovery completed - restarting quest",
+					Duration = 3,
+					Icon = "rbxassetid://124426992222665"
+				})
+
+				print("Quest stuck recovery completed - restarting auto artifact quest")
+				task.wait(1)
+				artifactQuestStartTime = tick() -- Reset the timer
+				autoArtifactQuestEnabled = true -- Re-enable and let the heartbeat restart it
+				autoArtifactQuest() -- Restart immediately
+			end
+			return
+		end
+
 		for artifactName, locations in pairs(artifactLocations) do
 			local hasArtifact, artifactItem = hasArtifactInInventory(artifactName)
 
@@ -418,6 +548,9 @@ return function(config)
 			artifactQuestConnection:Disconnect()
 		end
 
+		-- Initialize stuck recovery timer
+		artifactQuestStartTime = tick()
+
 		autoArtifactQuest()
 
 		artifactQuestConnection = RunService.Heartbeat:Connect(function()
@@ -439,6 +572,7 @@ return function(config)
 	local function stopAutoArtifactQuest()
 		-- Immediately stop everything
 		autoArtifactQuestEnabled = false
+		artifactQuestStartTime = 0 -- Reset timer
 		
 		if artifactQuestConnection then
 			artifactQuestConnection:Disconnect()
